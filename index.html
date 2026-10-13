@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>La Oficina · Vacilando Ando</title>
+    <meta name="description" content="Oficina virtual con agentes de IA para el contenido de Instagram y TikTok de Vacilando Ando Tours." />
+    <meta name="theme-color" content="#0e9aa7" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#/" aria-label="Inicio de La Oficina">
+        <img src="assets/icon.svg" alt="" width="34" height="34" />
+        <span class="brand-text">
+          <strong>La Oficina</strong>
+          <small>Vacilando Ando Tours</small>
+        </span>
+      </a>
+      <nav class="topnav" aria-label="Accesos rápidos">
+        <a class="btn btn-ghost btn-sm" href="#/juntas">🤝 <span class="hide-sm">Sala de juntas</span></a>
+        <a class="btn btn-ghost btn-sm" href="#/config" aria-label="Configuración">⚙️ <span class="hide-sm">Configuración</span></a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="stage" aria-label="La oficina">
+        <div id="office" class="office"></div>
+        <nav id="dock" class="dock" aria-label="Ir a una oficina"></nav>
+      </section>
+      <aside id="panel" class="panel" aria-live="polite"></aside>
+    </main>
+
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toasts" aria-live="polite"></div>
+    <noscript>Esta app necesita JavaScript activado.</noscript>
+  </body>
+</html>
