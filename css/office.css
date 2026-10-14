@@ -435,3 +435,13 @@
   12% { opacity: 1; }
   36%, 100% { opacity: 0; transform: translateY(-5px); }
 }
+
+/* Al tocar una oficina en el teléfono Chrome dibujaba un rectángulo (resaltado de toque / aro de foco del navegador sobre la caja del piso). El aviso de foco propio ya está en cada elemento. */
+.office-svg,
+.office-svg * {
+  -webkit-tap-highlight-color: transparent;
+}
+.office-svg :focus,
+.office-svg :focus-visible {
+  outline: none;
+}
