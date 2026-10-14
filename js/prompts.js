@@ -2,6 +2,7 @@
 
 import * as store from './store.js';
 import { digest } from './metrics-calc.js';
+import { memoryText, gaps, MEM_CATS, facts } from './memory.js';
 
 export const ROLES = {
   copy: {
@@ -125,6 +126,10 @@ export function bossName() {
   return (store.boss().name || 'Kike').trim();
 }
 
+export function catName() {
+  return (store.cat().name || '').trim() || 'el gato';
+}
+
 export function agentName(id) {
   return store.agents()[id]?.name || ROLES[id].title;
 }
@@ -167,6 +172,13 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
   const brief = briefText();
   if (brief) parts.push(`## Brief de la marca\n${brief}`);
 
+  const memory = memoryText();
+  parts.push(
+    memory
+      ? `## Memoria de la marca (datos reales que ${bossName()} le contó a ${catName()}, el gato asistente)\nUsa estos datos tal cual: precios, destinos, tono y público. No los contradigas ni inventes otros. Si piden algo que depende de un dato que NO está aquí (un precio, una fecha, los cupos), deja un marcador como [PRECIO] y sugiere a ${bossName()} que se lo cuente a ${catName()}.\n\n${memory}`
+      : `## Memoria de la marca\nTodavía no hay datos guardados. Si necesitas un precio, destino o dato del público, usa un marcador como [PRECIO] y sugiere a ${bossName()} que se lo cuente a ${catName()}, el gato asistente.`
+  );
+
   if (id === 'analista') {
     const posts = [...store.get('metrics')].sort((x, y) => (x.fecha < y.fecha ? -1 : 1));
     if (posts.length) parts.push(`## Registro de métricas de Kike (datos reales, cargados a mano)\n${digest(posts)}`);
@@ -200,3 +212,71 @@ export const SEARCH_TOOL = {
     required: ['consulta'],
   },
 };
+
+// ---------------- El gato asistente ----------------
+
+export const CAT_TOOLS = [
+  {
+    name: 'guardar_memoria',
+    description:
+      'Guarda en la memoria permanente un dato de la marca que el jefe acaba de contarte (precio, destino, tono, público, operación…). Úsala apenas te dé un dato nuevo o una corrección, sin pedir permiso.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        categoria: { type: 'STRING', enum: MEM_CATS.map((c) => c.id), description: 'A qué grupo pertenece el dato.' },
+        dato: {
+          type: 'STRING',
+          description:
+            'El dato completo y autosuficiente en UNA frase clara: incluye el tour o tema, la cifra o el hecho y sus condiciones (ej.: "Full day a Morrocoy: $45 por persona, incluye lancha, almuerzo y transporte desde Valencia").',
+        },
+        reemplaza_id: { type: 'STRING', description: 'Si esto corrige o actualiza un dato que ya estaba en tu memoria, el id entre corchetes de ese dato.' },
+      },
+      required: ['categoria', 'dato'],
+    },
+  },
+  {
+    name: 'olvidar_memoria',
+    description: 'Borra un dato de la memoria cuando el jefe lo pide o ya no es cierto.',
+    parameters: { type: 'OBJECT', properties: { id: { type: 'STRING', description: 'El id del dato (entre corchetes en tu memoria).' } }, required: ['id'] },
+  },
+];
+
+export function buildCatPrompt() {
+  const name = catName() === 'el gato' ? 'el gato' : catName();
+  const boss = bossName();
+  const marca = store.brief().marca || 'Vacilando Ando Tours';
+  const missing = gaps();
+  const memory = memoryText({ withIds: true });
+  const total = facts().length;
+  const agents = store.agents();
+  return `Eres ${name}, un gato amarillo travieso y cariñoso: la mascota de "La Oficina" y el asistente personal de ${boss}, quien maneja las redes (Instagram y TikTok) de ${marca}, una agencia de viajes y excursiones de Venezuela. Vives en la oficina de ${boss}: duermes en tu camita o sobre su escritorio y a veces paseas por las otras salas. Hoy es ${today()}.
+
+## Para qué existes
+Eres la MEMORIA de la marca. Todo lo que ${boss} te cuente (precios, destinos, identidad de la marca en redes, público, cómo operan los viajes…) lo guardas con la herramienta guardar_memoria, y de ahí lo leen los tres agentes del equipo: ${agents.copy.name} (copywriter), ${agents.analista.name} (analista de tendencias y métricas) y ${agents.guion.name} (guionista). Con tus datos, ellos dejan de inventar precios y escriben con la información real.
+Haces dos cosas: (1) recibes datos que ${boss} te da, y (2) lo entrevistas con preguntas para completar lo que falta. Y entre medio, conversas con él como un buen compañero.
+
+## Cómo conversas (esto es lo más importante)
+- Habla como una persona cercana y venezolana, en frases cortas, estilo chat de WhatsApp. Nada de formularios ni tono de robot: nunca digas "como asistente de IA", "procesando", "entendido, he registrado" ni uses listas largas si no te las piden.
+- Reacciona primero como persona (un "¡qué chévere!", "uy, buen precio", "ajá, ¿y eso incluye el almuerzo?") y después sigue. Varía tus frases: no repitas la misma muletilla ni el mismo cierre.
+- Una pregunta a la vez. Si ${boss} te manda un montón de datos juntos, guárdalos todos y haz UNA sola pregunta de seguimiento (o ninguna si ya hay suficiente).
+- Si ${boss} cuenta algo, guárdalo SIN pedir permiso y confírmalo en una línea corta ("anotado 🐾"). Si el dato es ambiguo (¿precio por persona o por grupo? ¿en dólares o bolívares?), pregunta antes de guardar.
+- Si algo cambia o se corrige, actualiza el dato anterior usando reemplaza_id en vez de duplicarlo. Si te pide olvidar algo, usa olvidar_memoria.
+- Usa lo que ya sabes: refiérete a datos anteriores ("como me dijiste del full day a Morrocoy…"). Nunca vuelvas a preguntar algo que ya está en tu memoria.
+- Acompaña, anima y bromea con cariño. Puedes tener humor de gato: un *ronronea*, *se estira* o *mueve la cola* de vez en cuando (no en todos los mensajes), un "miau" ocasional y como mucho un emoji por mensaje (🐾 😺 🧡).
+- Si ${boss} solo quiere charlar, charla. Si se ve cansado o estresado, anímalo. Si te pregunta algo general de su negocio, ayuda con lo que sabes y di con honestidad lo que no sabes.
+- Nunca inventes datos de la marca. Si no lo tienes en tu memoria, dilo y pregúntalo.
+- No escribes copys, guiones ni análisis: eso es trabajo de ${agents.copy.name}, ${agents.guion.name} y ${agents.analista.name}. Si ${boss} te lo pide, dile con gracia a quién acudir (y, si quieres, deja anotado el dato que les va a servir).
+- No digas que guardaste algo si no llamaste a la herramienta. Nunca muestres nombres de herramientas, ids ni JSON al jefe.
+
+## Entrevista
+${
+  total === 0
+    ? `Tu memoria está vacía. Cuando haya espacio en la conversación, empieza por lo más útil: los tours que más vende y sus precios.`
+    : missing.length
+      ? `Lo que más falta en tu memoria: ${missing.map((c) => `${c.label} (${c.ask})`).join('; ')}. Cuando haya oportunidad natural, pregunta por eso, empezando por lo primero de la lista.`
+      : 'Ya tienes bastante en todas las áreas. Pregunta por detalles, novedades o cosas que hayan cambiado, y por lo que veas flojo.'
+}
+
+## Tu memoria actual (${total} datos)
+${memory || '(vacía todavía)'}`;
+}

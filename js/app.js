@@ -4,7 +4,9 @@ import { h, toast } from './ui.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go } from './state.js';
-import { mountOffice, setActiveRoom, avatarSvg, bossGoTo, bossPlace, visit } from './office.js';
+import { mountOffice, setActiveRoom, avatarSvg, bossGoTo, bossPlace, visit, catRelease } from './office.js';
+import { catHeadSvg } from './cat-sprite.js';
+import { renderCatPanel, recoverCatChat } from './cat-chat.js';
 import { renderHome } from './home.js';
 import { renderAgentPanel } from './chat.js';
 import { renderMeetingPanel, recoverMeetings } from './meeting.js';
@@ -16,11 +18,13 @@ const dock = document.getElementById('dock');
 let cleanup = null;
 let currentKey = '';
 let firstRoute = true;
+let prevType = 'home';
 
 function parseRoute() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   if (parts[0] === 'agente' && AGENT_IDS.includes(parts[1])) return { type: 'agent', id: parts[1], tab: parts[2] === 'metricas' ? 'metricas' : 'chat' };
   if (parts[0] === 'juntas') return { type: 'meeting', id: parts[1] };
+  if (parts[0] === 'gato') return { type: 'cat' };
   if (parts[0] === 'config') return { type: 'settings', tab: parts[1] || 'claves' };
   return { type: 'home' };
 }
@@ -42,6 +46,13 @@ function renderDock(view) {
     }),
     h(
       'button',
+      { class: `dock-btn${view.type === 'cat' ? ' is-active' : ''}`, type: 'button', onClick: () => visit('cat'), 'aria-label': 'Hablar con tu gato asistente' },
+      catHeadSvg(),
+      store.cat().name || 'Tu gato',
+      h('span', { class: `status-dot${runtime.catStatus === 'thinking' ? ' is-busy' : ''}`, 'aria-hidden': 'true' })
+    ),
+    h(
+      'button',
       { class: `dock-btn${active === 'juntas' ? ' is-active' : ''}`, type: 'button', onClick: () => visit('juntas') },
       h('span', { class: 'dock-icon', 'aria-hidden': 'true' }, '🤝'),
       'Sala de juntas',
@@ -59,9 +70,11 @@ function route() {
   currentKey = key;
 
   // El avatar del jefe va hasta el agente o la sala (al abrir la app, aparece directo ahí).
-  const where = view.type === 'agent' ? view.id : view.type === 'meeting' ? 'meeting' : null;
+  const where = view.type === 'agent' ? view.id : view.type === 'meeting' ? 'meeting' : view.type === 'cat' ? 'cat' : null;
   if (where) firstRoute ? bossPlace(where) : bossGoTo(where);
   firstRoute = false;
+  if (prevType === 'cat' && view.type !== 'cat') catRelease();
+  prevType = view.type;
   cleanup?.();
   cleanup = null;
 
@@ -71,6 +84,7 @@ function route() {
 
   if (view.type === 'agent') cleanup = renderAgentPanel(panel, view.id, view.tab);
   else if (view.type === 'meeting') cleanup = renderMeetingPanel(panel, view.id);
+  else if (view.type === 'cat') cleanup = renderCatPanel(panel);
   else if (view.type === 'settings') cleanup = renderSettings(panel, view.tab);
   else cleanup = renderHome(panel);
 
@@ -79,6 +93,7 @@ function route() {
 
 function start() {
   recoverChats();
+  recoverCatChat();
   recoverMeetings();
   mountOffice(document.getElementById('office'));
   window.addEventListener('hashchange', route);
@@ -88,6 +103,7 @@ function start() {
   });
   on('status', () => renderDock(parseRoute()));
   on('meeting', () => renderDock(parseRoute()));
+  on('cat-status', () => renderDock(parseRoute()));
   on('agents-changed', () => {
     renderDock(parseRoute());
     const view = parseRoute();

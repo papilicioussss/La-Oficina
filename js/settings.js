@@ -9,10 +9,13 @@ import { tavilySearch, SearchUnavailable } from './search.js';
 import { listGroqModels } from './groq.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
+import { catHeadSvg } from './cat-sprite.js';
+import { MEM_CATS, facts, addFact, updateFact, removeFact, clearMemory } from './memory.js';
 
 const TABS = [
   ['claves', '🔑 Claves'],
   ['equipo', '👥 Equipo'],
+  ['memoria', '🧠 Memoria'],
   ['marca', '🏝️ Marca'],
   ['fuentes', '📚 Fuentes'],
   ['datos', '💾 Datos'],
@@ -40,6 +43,10 @@ const saveAgents = debounce(() => {
   emit('agents-changed');
 }, 450);
 const saveBrief = debounce(() => store.save('brief'), 400);
+const saveCat = debounce(() => {
+  store.save('cat');
+  emit('agents-changed');
+}, 450);
 const saveBoss = debounce(() => {
   store.save('boss');
   emit('agents-changed');
@@ -446,6 +453,35 @@ function bossCard() {
   );
 }
 
+function catCard() {
+  const c = store.cat();
+  return h(
+    'section',
+    { class: 'team-card', style: { borderColor: '#fde07e' } },
+    h(
+      'div',
+      { class: 'team-card-head' },
+      h('div', { class: 'avatar-lg', style: { background: '#fde07e' } }, catHeadSvg('avatar-lg')),
+      h('div', null, h('strong', null, '🐱 Tu gato asistente'), h('div', { class: 'hint' }, 'Mascota de la oficina y memoria de la marca. Toca al gato en la oficina para hablar con él.'))
+    ),
+    field(
+      'Nombre del gato',
+      h('input', {
+        type: 'text',
+        value: c.name,
+        maxlength: 18,
+        placeholder: 'Ej.: Mango',
+        onInput: (e) => {
+          c.name = e.target.value.trim().slice(0, 18);
+          c.named = !!c.name || c.named;
+          saveCat();
+        },
+      }),
+      c.named ? null : 'Si lo dejas vacío, te lo pedirá la primera vez que lo toques.'
+    )
+  );
+}
+
 function teamTab() {
   const agents = store.agents();
   const wrap = h('div');
@@ -456,7 +492,7 @@ function teamTab() {
       '¡Bautiza a tu equipo! Ponles nombre, personalidad y estilo. La personalidad cambia cómo te hablan; las indicaciones extra son reglas fijas que siempre van a seguir.'
     )
   );
-  wrap.append(bossCard());
+  wrap.append(bossCard(), catCard());
   for (const id of AGENT_IDS) {
     const a = agents[id];
     const role = ROLES[id];
@@ -527,6 +563,106 @@ function teamTab() {
       )
     );
   }
+  return wrap;
+}
+
+// ---------------- Memoria ----------------
+function memoryTab() {
+  const wrap = h('div');
+  const render = () => {
+    const list = facts();
+    const nodes = [
+      h(
+        'p',
+        { class: 'note' },
+        '🧠 Esto es lo que tu gato sabe de la marca. Los tres agentes lo leen en cada respuesta. Puedes corregirlo aquí o contándoselo al gato en el chat.'
+      ),
+    ];
+    for (const c of MEM_CATS) {
+      const rows = list.filter((f) => f.cat === c.id);
+      const box = h('section', { class: 'mem-cat' }, h('div', { class: 'section-title' }, `${c.icon} ${c.label} · ${rows.length}`));
+      if (!rows.length) box.append(h('p', { class: 'hint' }, `Aún sin datos. Cuéntale al gato ${c.ask}.`));
+      for (const f of rows) {
+        const ta = h('textarea', {
+          rows: 2,
+          value: f.text,
+          'aria-label': `Dato de ${c.label}`,
+          onChange: (e) => {
+            const v = e.target.value.trim();
+            if (v) updateFact(f.id, { text: v });
+            else render();
+          },
+        });
+        box.append(
+          h(
+            'div',
+            { class: 'mem-row' },
+            ta,
+            h(
+              'button',
+              {
+                class: 'icon-btn',
+                type: 'button',
+                'aria-label': 'Borrar dato',
+                onClick: () => {
+                  removeFact(f.id);
+                  render();
+                },
+              },
+              '🗑️'
+            )
+          )
+        );
+      }
+      nodes.push(box);
+    }
+    // Agregar a mano
+    const catSel = h('select', null, MEM_CATS.map((c) => h('option', { value: c.id }, `${c.icon} ${c.label}`)));
+    const text = h('textarea', { rows: 2, placeholder: 'Ej.: Full day a Morrocoy: $45 por persona, incluye lancha, almuerzo y transporte desde Valencia.' });
+    nodes.push(
+      h(
+        'div',
+        { class: 'team-card' },
+        h('strong', null, '➕ Agregar un dato'),
+        h('div', { style: { height: '8px' } }),
+        catSel,
+        h('div', { style: { height: '8px' } }),
+        text,
+        h('div', { style: { height: '8px' } }),
+        h(
+          'button',
+          {
+            class: 'btn btn-primary btn-sm',
+            type: 'button',
+            onClick: () => {
+              if (!text.value.trim()) return toast('Escribe el dato.', 'warn');
+              addFact({ cat: catSel.value, text: text.value });
+              render();
+              toast('Dato guardado ✔', 'ok', 1800);
+            },
+          },
+          'Guardar dato'
+        )
+      ),
+      list.length
+        ? h(
+            'button',
+            {
+              class: 'btn btn-ghost btn-sm',
+              type: 'button',
+              onClick: async () => {
+                if (!(await confirmDialog('¿Borrar TODA la memoria del gato? Los agentes dejarán de conocer estos datos.', { okLabel: 'Sí, borrar todo', danger: true }))) return;
+                clearMemory();
+                render();
+              },
+            },
+            '🧹 Borrar toda la memoria'
+          )
+        : null
+    );
+    wrap.replaceChildren(...nodes);
+  };
+  render();
   return wrap;
 }
 
@@ -694,7 +830,7 @@ function dataTab() {
     h(
       'div',
       { class: 'chips' },
-      danger('🧹 Borrar conversaciones', '¿Borrar las conversaciones de las tres oficinas?', AGENT_IDS.map((id) => 'chat:' + id), () => emit('chat', { agentId: '*', type: 'append' })),
+      danger('🧹 Borrar conversaciones', '¿Borrar las conversaciones de las tres oficinas y del gato? (La memoria del gato se queda.)', [...AGENT_IDS.map((id) => 'chat:' + id), 'chat:gato'], () => emit('chat', { agentId: '*', type: 'append' })),
       danger('🧹 Borrar reuniones', '¿Borrar todas las actas de la sala de juntas?', ['meetings']),
       danger('🧹 Borrar métricas', '¿Borrar todo el registro de métricas?', ['metrics']),
       danger('⚠️ Borrar todo', '¿Borrar TODO (claves, equipo, brief, conversaciones, métricas)? No se puede deshacer.', Object.keys(store.DEFAULTS), () =>
@@ -718,7 +854,7 @@ export function renderSettings(panel, tab = 'claves') {
     { class: 'tabs', role: 'tablist' },
     TABS.map(([k, label]) => h('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(k === tab), onClick: () => go(`#/config/${k}`) }, label))
   );
-  const content = { claves: keysTab, equipo: teamTab, marca: brandTab, fuentes: sourcesTab, datos: dataTab }[tab]();
+  const content = { claves: keysTab, equipo: teamTab, memoria: memoryTab, marca: brandTab, fuentes: sourcesTab, datos: dataTab }[tab]();
   panel.replaceChildren(head, tabs, h('div', { class: 'panel-body' }, content));
   return () => {
     store.save('settings');

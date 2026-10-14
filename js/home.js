@@ -16,7 +16,8 @@ function checklist() {
     { done: !!s.geminiKey, label: 'Pega tu API key de Google AI Studio', to: '#/config/claves' },
     { done: !!(s.tavilyKey || s.tavilyProxy) || s.searchProvider === 'google', label: 'Pega tu API key de Tavily (búsqueda web)', to: '#/config/claves' },
     { done: named, label: 'Bautiza a tu equipo', to: '#/config/equipo' },
-    { done: !!(b.destinos.trim() && b.publico.trim()), label: 'Completa el brief: destinos y público', to: '#/config/marca' },
+    { done: store.cat().named, label: 'Ponle nombre a tu gato (toca al gato en tu oficina)', to: '#/gato' },
+    { done: !!(b.destinos.trim() && b.publico.trim()) || store.memory().length >= 3, label: 'Cuéntale al gato tus precios, destinos y público', to: '#/gato' },
   ];
   if (steps.every((x) => x.done)) return null;
   return h(

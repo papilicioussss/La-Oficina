@@ -83,11 +83,15 @@ export const DEFAULTS = {
       look: { shirt: '#00a100', skin: '#8d5524', hair: '#0f0f0f', hairStyle: 'curly' },
     },
   },
+  // Gato asistente: nombre y memoria de la marca (datos que Kike le cuenta)
+  cat: { name: '', named: false },
+  memory: [],
   meetings: [],
   metrics: [],
   'chat:copy': [],
   'chat:analista': [],
   'chat:guion': [],
+  'chat:gato': [],
 };
 
 const cache = {};
@@ -108,6 +112,7 @@ function read(key) {
   if (stored === undefined) return fallback;
   // Mezcla con los valores por defecto para que campos nuevos siempre existan.
   if (key === 'settings' || key === 'brief') return { ...fallback, ...stored };
+  if (key === 'cat') return { ...fallback, ...stored };
   if (key === 'boss') return { ...fallback, ...stored, look: { ...fallback.look, ...(stored.look || {}) } };
   if (key === 'agents') {
     const out = {};
@@ -150,6 +155,8 @@ export const settings = () => get('settings');
 export const brief = () => get('brief');
 export const agents = () => get('agents');
 export const boss = () => get('boss');
+export const cat = () => get('cat');
+export const memory = () => get('memory');
 export const chat = (id) => get('chat:' + id);
 
 // ---------- Respaldo ----------

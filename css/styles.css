@@ -1740,3 +1740,154 @@ textarea {
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(50, 73, 102, 0.25);
 }
+
+/* ---------- El gato ---------- */
+.cat-agent {
+  cursor: pointer;
+}
+.cat-agent:focus {
+  outline: none;
+}
+.cat-agent:focus .cat-tag rect {
+  stroke: #1a2433;
+  stroke-width: 1.6;
+}
+.cat .pose {
+  display: none;
+}
+.cat[data-pose='walk'] .pose-walk,
+.cat[data-pose='sit'] .pose-sit,
+.cat[data-pose='sleep'] .pose-sleep {
+  display: inline;
+}
+.cat .eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 5.5s infinite;
+}
+.cat .ear-twitch {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: ear-twitch 7s infinite;
+}
+@keyframes ear-twitch {
+  0%,
+  90%,
+  100% {
+    transform: rotate(0);
+  }
+  93% {
+    transform: rotate(-9deg);
+  }
+  96% {
+    transform: rotate(5deg);
+  }
+}
+.zzz {
+  opacity: 0;
+  animation: zfloat 3.2s infinite;
+}
+.zzz.z2 {
+  animation-delay: 1s;
+}
+.zzz.z3 {
+  animation-delay: 2s;
+}
+@keyframes zfloat {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+.cat-bubble {
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.cat-bubble .bubble-bg,
+.cat-bubble .bubble-tail {
+  fill: #ffffff;
+  stroke: #d9c6a5;
+  stroke-width: 0.8;
+}
+.cat-bubble .bubble-text {
+  fill: #1a2433;
+}
+.cat-tag {
+  pointer-events: none;
+}
+.avatar-xl {
+  width: 120px;
+  height: 120px;
+}
+.cat-name-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.cat-name-card .field {
+  width: 100%;
+  text-align: left;
+}
+.cat-name-card p {
+  margin: 0;
+  color: var(--ink-2);
+}
+.cat-name-card h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+}
+.cat-name-art {
+  background: #fde07e;
+  border-radius: 50%;
+  padding: 10px;
+  margin-top: 8px;
+}
+.msg-cat {
+  background: color-mix(in srgb, #fde07e 22%, var(--surface));
+}
+.saved-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.saved-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  padding: 7px 10px;
+}
+.saved-chip.is-undone {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.saved-text {
+  flex: 1;
+  min-width: 0;
+}
+.mem-cat {
+  margin-bottom: 18px;
+}
+.mem-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+.mem-row textarea {
+  min-height: 44px;
+  padding: 7px 10px;
+}

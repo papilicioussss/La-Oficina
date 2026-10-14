@@ -26,6 +26,9 @@ export const runtime = {
   activeMeetingId: null,
   meetingBusy: false,
   tavilyBlocked: false,
+  groqBlocked: false,
+  groqWarned: false,
+  catStatus: 'idle', // idle | thinking | talking
 };
 
 export function setStatus(id, status) {

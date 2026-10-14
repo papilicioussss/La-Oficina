@@ -2,10 +2,11 @@
 // con personajes que caminan y el avatar del jefe que se mueve por la oficina.
 
 import { s } from './ui.js';
+import { buildCatSprite } from './cat-sprite.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, STATUS_LABEL, go } from './state.js';
-import { ROLES } from './prompts.js';
+import { ROLES, catName } from './prompts.js';
 
 // ---------- Proyección isométrica ----------
 const TW = 16; // px por unidad (horizontal)
@@ -301,6 +302,16 @@ function roomItems(room) {
     const [gx, gy] = iso(18.9, 29.5, 1.75);
     add(46.4, s('circle', { cx: gx, cy: gy, r: 4.2, fill: '#22a6c0', stroke: '#2e7d4f', 'stroke-width': 1.4 }), [16.4, 28.4, 20.0, 29.9]);
     add(52.0, box(22.4, 29.4, 0, 1.2, 3.4, 0.8, ['#3f8f9a', '#2f7a85', '#256570']), [22.4, 29.4, 23.6, 32.8]);
+    // camita del gato
+    const ell = (cx, cy, z, r, fill) => {
+      const [ex, ey] = iso(cx, cy, z);
+      return s('ellipse', { cx: ex, cy: ey, rx: r * 22.6, ry: r * 11.3, fill });
+    };
+    add(
+      45.8,
+      s('g', null, ell(14.2, 31.6, 0, 1.2, '#b8531f'), ell(14.2, 31.6, 0.3, 1.2, '#ff8a3d'), ell(14.2, 31.6, 0.34, 0.86, '#fde07e'), ell(14.2, 31.7, 0.36, 0.5, '#ffd25c')),
+      [13.0, 30.5, 15.4, 32.7]
+    );
     add(52.1, box(23.25, 29.4, 0.8, 0.35, 3.4, 0.9, ['#3f8f9a', '#2f7a85', '#256570']), [22.4, 29.4, 23.6, 32.8]);
   }
   return items;
@@ -608,9 +619,15 @@ export function renderOffice(container) {
   boss.el.classList.toggle('facing-away', boss.facing === 'away');
   boss.el.classList.toggle('walking', !!boss.path.length);
   setBossPos(boss.x, boss.y);
+  buildCat();
+  setCatPos(cat.x, cat.y, cat.z);
 
   // Interacción: tocar un agente o una etiqueta = ir a consultarle; tocar el piso = caminar hasta ahí.
   svg.addEventListener('click', (e) => {
+    if (e.target.closest('[data-cat]')) {
+      visit('cat');
+      return;
+    }
     const target = e.target.closest('[data-agent], .room-label');
     if (target) {
       visit(target.dataset.agent || target.dataset.room);
@@ -629,10 +646,10 @@ export function renderOffice(container) {
   });
   svg.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    const target = e.target.closest('[data-agent], [data-room]');
+    const target = e.target.closest('[data-cat], [data-agent], [data-room]');
     if (!target) return;
     e.preventDefault();
-    visit(target.dataset.agent || target.dataset.room);
+    visit(target.dataset.cat ? 'cat' : target.dataset.agent || target.dataset.room);
   });
 
   host.replaceChildren(svg);
@@ -722,6 +739,7 @@ const OBSTACLES = [
   [17.6, 26.4, 18.8, 26.7],
   [16.4, 28.4, 20.0, 29.9],
   [22.4, 29.4, 23.6, 32.8],
+  [13.0, 30.5, 15.4, 32.7],
   ...PARTITIONS.map(([axis, at, a, b]) => (axis === 'x' ? [at - 0.15, a, at + 0.15, b] : [a, at - 0.15, b, at + 0.15])),
 ];
 
@@ -859,24 +877,29 @@ function roomAt(x, y) {
   return x < 12 ? 'guion' : 'juntas';
 }
 
-function isBehind(node, x, y) {
+function isBehind(node, x, y, onTop) {
+  if (node.__mover) return node.__depth <= x + y;
   const b = node.__bounds;
-  if (b) return b[2] <= x + 0.05 || b[3] <= y + 0.05;
+  if (b) {
+    // Algo que está encima de un mueble (el gato en el escritorio o en su cama) se dibuja después de él.
+    if (onTop && x >= b[0] - 0.1 && x <= b[2] + 0.1 && y >= b[1] - 0.1 && y <= b[3] + 0.1) return true;
+    return b[2] <= x + 0.05 || b[3] <= y + 0.05;
+  }
   return node.__depth != null && node.__depth <= x + y;
 }
 
-/** Coloca al jefe en la capa de su sala, delante de lo que tiene detrás. */
-function relayerBoss() {
-  if (!layers?.rooms || !boss.el) return;
-  const layer = layers.rooms[roomAt(boss.x, boss.y)];
-  const kids = [...layer.children].filter((n) => n !== boss.el);
+/** Coloca a un personaje que se mueve en la capa de su sala, delante de lo que tiene detrás. */
+function relayer(ent) {
+  if (!layers?.rooms || !ent.el) return;
+  const layer = layers.rooms[roomAt(ent.x, ent.y)];
+  const kids = [...layer.children].filter((n) => n !== ent.el);
   let lastBehind = -1;
   kids.forEach((n, i) => {
-    if (isBehind(n, boss.x, boss.y)) lastBehind = i;
+    if (isBehind(n, ent.x, ent.y, (ent.z || 0) > 0)) lastBehind = i;
   });
   const ref = kids[lastBehind + 1] || null;
-  if (boss.el.parentNode === layer && boss.el.nextSibling === ref) return;
-  layer.insertBefore(boss.el, ref);
+  if (ent.el.parentNode === layer && ent.el.nextSibling === ref) return;
+  layer.insertBefore(ent.el, ref);
 }
 
 function setBossPos(x, y) {
@@ -885,7 +908,9 @@ function setBossPos(x, y) {
   if (!boss.el) return;
   const [px, py] = iso(x, y);
   boss.el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
-  relayerBoss();
+  boss.el.__mover = true;
+  boss.el.__depth = x + y;
+  relayer(boss);
 }
 
 function setFacing(face) {
@@ -996,6 +1021,10 @@ function bossWalkTo(point, { face = null, target = null } = {}) {
 
 /** Lleva al jefe a un lugar conocido: 'home', 'meeting' o el id de un agente. */
 export function bossGoTo(where) {
+  if (where === 'cat') {
+    catAttend();
+    return bossWalkTo(catApproach(), { face: null, target: 'cat' });
+  }
   const spot = BOSS_SPOTS[where];
   if (!spot) return Promise.resolve(false);
   const [x, y] = spot.at;
@@ -1007,6 +1036,14 @@ export function bossGoTo(where) {
 
 /** Coloca al jefe sin animación (al abrir la app directo en una sección). */
 export function bossPlace(where) {
+  if (where === 'cat') {
+    catAttend();
+    const [x, y] = catApproach();
+    if (boss.done) finishPath(false);
+    boss.target = 'cat';
+    setBossPos(x, y);
+    return;
+  }
   const spot = BOSS_SPOTS[where];
   if (!spot) return;
   if (boss.done) finishPath(false);
@@ -1021,7 +1058,7 @@ export async function visit(key) {
     bossGoTo('home');
     return;
   }
-  const hash = key === 'juntas' ? '#/juntas' : AGENT_IDS.includes(key) ? `#/agente/${key}` : null;
+  const hash = key === 'juntas' ? '#/juntas' : key === 'cat' ? '#/gato' : AGENT_IDS.includes(key) ? `#/agente/${key}` : null;
   if (!hash) return;
   const where = key === 'juntas' ? 'meeting' : key;
   if (isSmallScreen()) {
@@ -1060,9 +1097,303 @@ function bindKeys() {
   window.addEventListener('blur', () => boss.keys.clear());
 }
 
+
+// ---------- El gato: se comporta como un gato ----------
+
+const CAT_SPEED = 3.4;
+const CAT_WANDER = [
+  [2.6, 5.4], [9.4, 9.6], [21.4, 4.6], [14.0, 9.6], [3.0, 19.6], [10.6, 23.0],
+  [17.8, 22.4], [21.6, 15.0], [14.6, 15.2], [21.2, 27.6], [15.4, 27.4], [16.2, 30.8],
+];
+// Lugares donde duerme: de pie en el piso, y encima del mueble.
+const CAT_PERCH = {
+  bed: { floor: [15.9, 31.6], on: [14.2, 31.6, 0.34], left: true },
+  desk: { floor: [18.9, 30.7], on: [18.9, 29.4, 1.32], left: false },
+};
+
+const cat = { x: 14.2, y: 31.6, z: 0.34, el: null, sprite: null, pose: 'sleep', flipLeft: true, perch: 'bed', path: [], arrive: null, gen: 0, cancel: null, listening: false, bubbleTimer: 0 };
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+function buildCat() {
+  const name = (catNameRaw() || '').trim();
+  const sprite = buildCatSprite();
+  const w = nameWidth(name || '¡Ponme nombre!', 8.5) + 2;
+  const el = s(
+    'g',
+    { class: 'cat-agent', 'data-cat': '1', role: 'button', tabindex: 0, 'aria-label': name ? `Hablar con ${name}, tu gato` : 'Tu gato: ponle nombre' },
+    s('ellipse', { class: 'cat-hit', cx: 0, cy: -14, rx: 30, ry: 28, fill: 'transparent' }),
+    sprite.el,
+    s(
+      'g',
+      { class: 'nametag cat-tag', transform: 'translate(0,-46)' },
+      s('rect', { x: -w / 2, y: -8, width: w, height: 14, rx: 7, fill: name ? '#fde07e' : '#ff8a3d' }),
+      s('text', { x: 0, y: 2.6, 'text-anchor': 'middle', 'font-size': 8.5, 'font-weight': 900, fill: '#1a2433' }, name || '¡Ponme nombre!')
+    ),
+    s(
+      'g',
+      { class: 'cat-bubble', transform: 'translate(0,-66)', opacity: 0 },
+      s('rect', { class: 'bubble-bg', x: -22, y: -9, width: 44, height: 17, rx: 8.5 }),
+      s('path', { class: 'bubble-tail', d: 'M-4 8 L0 13 L4 8 Z' }),
+      s('text', { class: 'bubble-text', x: 0, y: 3, 'text-anchor': 'middle', 'font-size': 8.5, 'font-weight': 700 }, '')
+    )
+  );
+  cat.el = el;
+  cat.sprite = sprite;
+  sprite.setPose(cat.pose);
+  sprite.setFlip(cat.flipLeft);
+  el.__mover = true;
+  if (runtime.catStatus === 'thinking') catSay('💭', 60000);
+  return el;
+}
+
+function catNameRaw() {
+  const n = catName();
+  return n === 'el gato' ? '' : n;
+}
+
+function setCatPos(x, y, z = 0, lift = 0) {
+  cat.x = x;
+  cat.y = y;
+  cat.z = z;
+  if (!cat.el) return;
+  const [px, py] = iso(x, y, z + lift);
+  cat.el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
+  cat.el.__depth = x + y;
+  relayer(cat);
+}
+
+function setCatPose(pose) {
+  cat.pose = pose;
+  cat.sprite?.setPose(pose);
+}
+
+function catFace(dx, dy) {
+  const sdx = dx - dy; // dirección en pantalla
+  if (Math.abs(sdx) < 0.02) return;
+  cat.flipLeft = sdx < 0;
+  cat.sprite?.setFlip(cat.flipLeft);
+}
+
+function catSay(text, ms = 2200) {
+  const g = cat.el?.querySelector('.cat-bubble');
+  if (!g) return;
+  g.querySelector('.bubble-text').textContent = text;
+  const w = Math.max(30, text.length * 6 + 16);
+  const bg = g.querySelector('.bubble-bg');
+  bg.setAttribute('x', -w / 2);
+  bg.setAttribute('width', w);
+  g.setAttribute('opacity', 1);
+  clearTimeout(cat.bubbleTimer);
+  cat.bubbleTimer = setTimeout(() => g.setAttribute('opacity', 0), ms);
+}
+
+/** Espera `ms` o hasta que se cancele (cuando Kike lo llama). */
+function catNap(ms) {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => {
+      cat.cancel = null;
+      resolve();
+    }, ms);
+    cat.cancel = () => {
+      clearTimeout(t);
+      cat.cancel = null;
+      resolve();
+    };
+  });
+}
+
+function catAnimate(ms, draw) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / ms);
+      draw(k);
+      if (k < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** Salto (a un mueble o de vuelta al piso). */
+async function catHop(x, y, z) {
+  const [x0, y0, z0] = [cat.x, cat.y, cat.z];
+  catFace(x - x0, y - y0);
+  setCatPose('sit');
+  if (reduceMotion()) return setCatPos(x, y, z);
+  await catAnimate(480, (k) => setCatPos(x0 + (x - x0) * k, y0 + (y - y0) * k, z0 + (z - z0) * k, Math.sin(Math.PI * k) * 0.9));
+}
+
+/** Camina hasta un punto por la ruta libre. Devuelve true si llegó. */
+function catWalk(to, gen) {
+  if (reduceMotion()) {
+    setCatPos(to[0], to[1], 0);
+    return Promise.resolve(true);
+  }
+  const path = findPath([cat.x, cat.y], to);
+  if (!path || path.length < 2) return Promise.resolve(false);
+  cat.path = path.slice(1);
+  setCatPose('walk');
+  return new Promise((resolve) => {
+    cat.arrive = (ok) => {
+      cat.arrive = null;
+      resolve(ok && gen === cat.gen);
+    };
+    let last = 0;
+    const tickCat = (ts) => {
+      if (gen !== cat.gen) return cat.arrive?.(false);
+      const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
+      last = ts;
+      let budget = CAT_SPEED * dt;
+      while (budget > 0 && cat.path.length) {
+        const [tx, ty] = cat.path[0];
+        const dx = tx - cat.x;
+        const dy = ty - cat.y;
+        const d = Math.hypot(dx, dy);
+        catFace(dx, dy);
+        if (d <= budget) {
+          setCatPos(tx, ty, 0);
+          cat.path.shift();
+          budget -= d;
+        } else {
+          setCatPos(cat.x + (dx / d) * budget, cat.y + (dy / d) * budget, 0);
+          budget = 0;
+        }
+      }
+      if (cat.path.length) requestAnimationFrame(tickCat);
+      else cat.arrive?.(true);
+    };
+    requestAnimationFrame(tickCat);
+  });
+}
+
+/** Si está encima de un mueble, baja al piso. */
+async function catDismount(gen) {
+  if (!cat.perch) return;
+  const p = CAT_PERCH[cat.perch];
+  cat.perch = null;
+  await catHop(p.floor[0], p.floor[1], 0);
+  if (gen !== cat.gen) return;
+  setCatPose('sit');
+}
+
+async function catSleepAt(name, gen) {
+  const p = CAT_PERCH[name];
+  if (cat.perch === name) {
+    setCatPose('sleep');
+  } else {
+    await catDismount(gen);
+    if (gen !== cat.gen || !(await catWalk(p.floor, gen))) return;
+    setCatPose('sit');
+    await catNap(rand(500, 1400));
+    if (gen !== cat.gen) return;
+    await catHop(p.on[0], p.on[1], p.on[2]);
+    if (gen !== cat.gen) return;
+    cat.perch = name;
+    cat.flipLeft = p.left;
+    cat.sprite.setFlip(p.left);
+    setCatPose('sit');
+    await catNap(rand(1200, 2600));
+    if (gen !== cat.gen) return;
+    setCatPose('sleep');
+  }
+  await catNap(rand(25000, 60000));
+}
+
+async function catRoam(gen) {
+  await catDismount(gen);
+  const spots = CAT_WANDER.filter(([x, y]) => isFree(x, y));
+  const to = pick(spots);
+  if (gen !== cat.gen || !to || !(await catWalk(to, gen))) return;
+  setCatPose('sit');
+  const mood = Math.random();
+  if (mood < 0.3) {
+    // se echa a descansar un rato donde llegó
+    setCatPose('sleep');
+    await catNap(rand(12000, 26000));
+  } else {
+    for (let i = 0; i < Math.floor(rand(2, 5)); i++) {
+      if (gen !== cat.gen) return;
+      await catNap(rand(2500, 6000));
+      if (Math.random() < 0.5) {
+        cat.flipLeft = !cat.flipLeft;
+        cat.sprite.setFlip(cat.flipLeft);
+      }
+      if (Math.random() < 0.25) catSay(pick(['mrrr', 'miau', '🐾']), 1800);
+    }
+  }
+}
+
+async function catLife(gen) {
+  await catNap(rand(8000, 18000));
+  while (gen === cat.gen) {
+    if (document.hidden || !svgRoot?.isConnected) {
+      await catNap(4000);
+      continue;
+    }
+    const r = Math.random();
+    if (r < 0.3) await catSleepAt('bed', gen);
+    else if (r < 0.55) await catSleepAt('desk', gen);
+    else await catRoam(gen);
+    if (gen === cat.gen) await catNap(rand(1500, 4500));
+  }
+}
+
+function catStart() {
+  const gen = ++cat.gen;
+  catLife(gen).catch(() => {});
+}
+
+/** Kike lo llamó: deja lo que hacía, se sienta y lo espera. */
+function catAttend() {
+  cat.gen++;
+  cat.listening = true;
+  cat.cancel?.();
+  cat.path = [];
+  cat.arrive?.(false);
+  if (cat.pose !== 'sit') setCatPose('sit');
+  catFace(boss.x - cat.x, boss.y - cat.y);
+  catSay('¡Miau!', 2000);
+}
+
+/** Terminó la conversación: vuelve a su vida de gato. */
+export function catRelease() {
+  if (!cat.listening) return;
+  cat.listening = false;
+  const gen = ++cat.gen;
+  setTimeout(() => {
+    if (gen === cat.gen && !cat.listening) catStart();
+  }, 3500);
+}
+
+/** Dónde se para Kike para hablar con el gato. */
+function catApproach() {
+  const base = cat.perch ? CAT_PERCH[cat.perch].floor : [cat.x, cat.y];
+  const offsets = cat.perch ? [[0, 0]] : [[1.1, 0], [0, 1.1], [-1.1, 0], [0, -1.1], [0.8, 0.8], [-0.8, 0.8]];
+  const options = offsets.map(([dx, dy]) => [base[0] + dx, base[1] + dy]).filter(([x, y]) => isFree(x, y));
+  if (!options.length) return base;
+  options.sort((a, b) => Math.hypot(a[0] - boss.x, a[1] - boss.y) - Math.hypot(b[0] - boss.x, b[1] - boss.y));
+  return options[0];
+}
+
+on('cat-status', ({ status }) => {
+  if (status === 'thinking') catSay('💭', 60000);
+  else cat.el?.querySelector('.cat-bubble')?.setAttribute('opacity', 0);
+});
+
 export function mountOffice(container) {
   renderOffice(container);
   bindKeys();
   on('status', ({ id }) => charEls[id] && updateBubble(charEls[id], id));
   on('agents-changed', () => renderOffice());
+  catStart();
 }
+
+/** Solo para pruebas automáticas: fuerza comportamientos del gato y lee su estado. */
+export const catTest = {
+  roam: () => catRoam(++cat.gen),
+  sleep: (name) => catSleepAt(name, ++cat.gen),
+  state: () => ({ x: cat.x, y: cat.y, z: cat.z, pose: cat.pose, perch: cat.perch, listening: cat.listening }),
+};
