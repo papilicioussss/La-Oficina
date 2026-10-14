@@ -38,6 +38,8 @@ if (!soportaWebGL()) {
 const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: nivelActual !== 'baja', alpha: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false; // las sombras se recalculan a mano: cada cuadro en calidad alta y uno de cada dos en las demás
+let cuadro = 0;
 renderer.toneMapping = THREE.NeutralToneMapping; // conserva los colores saturados del plástico (ACES los apaga)
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -51,7 +53,7 @@ const camara = new THREE.PerspectiveCamera(32, 1, 0.5, 200);
 const controles = new OrbitControls(camara, lienzo);
 controles.enableDamping = true;
 controles.dampingFactor = 0.08;
-controles.minDistance = 7;
+controles.minDistance = 2; // permite acercarse a una mano (antes el límite de 7 impedía verla de cerca)
 controles.maxDistance = 95;
 controles.maxPolarAngle = Math.PI * 0.47; // no baja por debajo del piso
 controles.target.set(0, 1.5, 0);
@@ -167,7 +169,7 @@ $('manos').addEventListener('click', () => {
   const m = nico.manoDer.getWorldPosition(new THREE.Vector3());
   aplicarAnimacion('talking'); // la mano se mueve al hablar, así se ve su forma desde varios ángulos
   const dir = new THREE.Vector3(0.6, 0.35, 1).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-  volarA(m.clone().addScaledVector(dir, 5.2), m, 900);
+  volarA(m.clone().addScaledVector(dir, 2.6), m, 900);
 });
 function pasoTween(ahora) {
   if (!tween) return;
@@ -234,6 +236,8 @@ function bucle(ahora) {
   }
   pasoTween(ahora);
   controles.update();
+  cuadro++;
+  if (nivelActual === 'alta' || cuadro % 2 === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(escena, camara);
   medida.tick(ahora);
   requestAnimationFrame(bucle);

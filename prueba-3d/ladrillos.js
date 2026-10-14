@@ -16,7 +16,7 @@ const perfilTaquito = [
   new THREE.Vector2(0.24, ALTO_TAQUITO),
   new THREE.Vector2(0, ALTO_TAQUITO),
 ];
-const geoTaquito = new THREE.LatheGeometry(perfilTaquito, 24);
+const geoTaquito = new THREE.LatheGeometry(perfilTaquito, 16);
 
 const geoCache = new Map();
 function geoCaja(w, h, d) {

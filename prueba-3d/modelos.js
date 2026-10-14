@@ -6,9 +6,13 @@
 //   objeto                      THREE.Object3D que se agrega a la escena
 //   animar(estado, t, dt)       avanza la animación; devuelve true cuando termina una animación de una sola vez (saludo)
 //   mirarA(Vector3 | null)      punto del mundo al que el personaje dirige la mirada (opcional)
-//   reposo()                    lleva el personaje a la postura de reposo sin transición (movimiento reducido)
+//   reposo()                    lleva el personaje a la postura de reposo sin transición
 //   manoDer                     Object3D de la mano derecha (para acercar la cámara en las pruebas)
+//   diagnostico()               ángulos reales de cuerpo y cabeza (solo para pruebas)
 // Estados: los de la app (idle | thinking | searching | talking | walking) más dos de prueba (saludo | escucha).
+//
+// CONVENCIÓN DE EJES (válida para todo el archivo): el FRENTE del personaje es +z, su derecha es +x y arriba es +y.
+// El cuerpo se orienta girando `objeto.rotation.y`; la cabeza solo gira respecto al cuerpo (yaw 0 = mira al frente).
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -54,27 +58,35 @@ function semilla(n) {
 }
 
 // ---------- Mano LEGO en forma de C ----------
-// Un anillo (radio exterior .36, interior .2, alto .44) con una abertura de ~75° que mira hacia adelante y un poco hacia afuera.
-// El eje de la C es vertical cuando el brazo cuelga; los bordes llevan bisel y las normales son suaves en las curvas.
+// Una sola pieza: perfil de "C" (anillo con pared delgada y los dos extremos redondeados) extruido en vertical.
+// Medidas en unidades de taquito: radio medio .21, pared .12, alto .36 (más pequeña que la manga, que mide .56 de ancho).
+// El eje de la C es vertical cuando el brazo cuelga; la abertura (~100°) mira al frente (+z) y un poco hacia afuera.
 const manos = new Map();
 function geometriaMano(lado) {
   if (manos.has(lado)) return manos.get(lado);
-  const Ro = 0.36;
-  const Ri = 0.2;
-  const alto = 0.44;
-  const centro = -Math.PI / 2 + lado * 0.6; // abertura al frente (+z), inclinada hacia afuera
-  const medio = 0.65;
-  const a0 = centro + medio;
-  const a1 = centro - medio + Math.PI * 2;
+  const Rm = 0.215; // radio medio
+  const w = 0.065; // medio grosor de la pared
+  const alto = 0.36;
+  const bisel = 0.025;
+  const centro = -Math.PI / 2 + lado * 0.38; // dirección de la abertura en el plano de la forma: -y de la forma = +z del mundo tras acostarla, y un poco hacia afuera
+  const medio = 0.88; // semi-apertura (~50°)
+  const a0 = centro + medio; // extremo "inicial" de la C
+  const a1 = centro - medio + Math.PI * 2; // extremo "final" (se recorre la C por el lado largo)
+  const punto = (a, r) => [Math.cos(a) * r, Math.sin(a) * r];
   const forma = new THREE.Shape();
-  forma.absarc(0, 0, Ro, a0, a1, false);
-  forma.lineTo(Math.cos(a1) * Ri, Math.sin(a1) * Ri);
-  forma.absarc(0, 0, Ri, a1, a0, true);
-  forma.closePath();
-  let g = new THREE.ExtrudeGeometry(forma, { depth: alto - 0.07, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 2, curveSegments: 16, steps: 1 });
-  g.rotateX(-Math.PI / 2); // la extrusión pasa a ser el eje vertical y la abertura mira a +z
-  g.translate(0, -(alto - 0.07) / 2, 0);
-  g = toCreasedNormals(g, 0.7); // suave en las curvas, filo en las aristas
+  const [sx, sy] = punto(a0, Rm + w);
+  forma.moveTo(sx, sy);
+  forma.absarc(0, 0, Rm + w, a0, a1, false); // borde exterior
+  const [c1x, c1y] = punto(a1, Rm);
+  forma.absarc(c1x, c1y, w, a1, a1 + Math.PI, false); // extremo redondeado
+  forma.absarc(0, 0, Rm - w, a1, a0, true); // borde interior de vuelta
+  const [c0x, c0y] = punto(a0, Rm);
+  forma.absarc(c0x, c0y, w, a0 + Math.PI, a0 + Math.PI * 2, false); // otro extremo redondeado
+  let g = new THREE.ExtrudeGeometry(forma, { depth: alto - bisel * 2, bevelEnabled: true, bevelThickness: bisel, bevelSize: bisel * 0.8, bevelSegments: 2, curveSegments: 14, steps: 1 });
+  // la forma está en el plano XY y se extruye en z: se acuesta para que el eje de la C quede vertical (y) y la abertura mire a +z
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, -(alto - bisel * 2) / 2, 0);
+  g = toCreasedNormals(g, 0.75); // suave en las curvas, con filo en las aristas
   manos.set(lado, g);
   return g;
 }
@@ -126,13 +138,27 @@ function texturaCara(ojosCerrados, bocaAbierta) {
 
 // Límites anatómicos (radianes) de cada articulación: nada se dobla más de lo que permite una minifigura real.
 const LIM = {
-  cabY: [-1.0, 1.0], cabX: [-0.35, 0.45], cabZ: [-0.3, 0.3],
-  torY: [-0.35, 0.35], torX: [-0.15, 0.2],
+  cabY: [-0.9, 0.9], cabX: [-0.35, 0.45], cabZ: [-0.3, 0.3],
+  torY: [-0.35, 0.35], torX: [-0.15, 0.2], torZ: [-0.12, 0.12],
   brazoX: [-2.6, 0.9], brazoAbd: [-0.05, 2.7],
   muneca: [-0.6, 0.6], giro: [-0.9, 0.9],
   pierna: [-0.6, 0.6],
 };
-const CAMPOS = ['cabY', 'cabX', 'cabZ', 'torY', 'torX', 'bIx', 'bIa', 'bDx', 'bDa', 'mI', 'mD', 'rD', 'pI', 'pD', 'alto'];
+const CAMPOS = ['cabY', 'cabX', 'cabZ', 'torY', 'torX', 'torZ', 'bIx', 'bIa', 'bDx', 'bDa', 'mI', 'mD', 'rD', 'pI', 'pD', 'alto'];
+// Rapidez relativa de cada grupo: la cabeza y las muñecas reaccionan primero, el torso y los hombros después.
+// Ese desfase hace que un gesto "se propague" (cabeza → torso → brazos → manos) en vez de moverse todo a la vez.
+const RAPIDEZ = { cabY: 1.3, cabX: 1.3, cabZ: 1.1, torY: 0.8, torX: 0.8, torZ: 0.7, bIx: 0.9, bIa: 0.9, bDx: 0.9, bDa: 0.9, mI: 1.5, mD: 1.5, rD: 1.6, pI: 1.0, pD: 1.0, alto: 2 };
+
+// Gestos de las manos al hablar: cada uno es una postura de brazos con intención. Se encadenan en un orden propio de cada personaje.
+const GESTOS = [
+  { bDx: -0.7, bDa: 0.6, bIx: -0.6, bIa: 0.55 }, // abre las manos
+  { bDx: -1.1, bDa: 0.2, bIx: -0.15, bIa: 0.1 }, // levanta una idea
+  { bDx: -0.9, bDa: 0.3, bIx: -0.5, bIa: 0.3 }, // enfatiza con las dos
+  { bDx: -0.8, bDa: 0.45, bIx: 0.0, bIa: 0.07 }, // solo la derecha
+  { bDx: -0.3, bDa: 0.15, bIx: -0.85, bIa: 0.4 }, // solo la izquierda
+];
+// Puntos a los que echa un vistazo en reposo (yaw, pitch). Ninguno es 0: el "frente" es la postura base.
+const VISTAZOS = [[-0.5, 0.05], [0.5, -0.02], [0.32, 0.1], [-0.32, -0.1], [0.62, 0.04]];
 
 /** Minifigura provisional: cabeza cilíndrica con taquito, torso, caderas, piernas, brazos rígidos y manos en C. */
 function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b4252', gorra = null, semilla: sem = 1 } = {}) {
@@ -164,10 +190,9 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     const hombro = grupo(lado * 1.28, 1.51, 0);
     hombro.add(malla(new THREE.SphereGeometry(0.29, 16, 12), mCamisa, 0, -0.04, 0)); // tapa la unión con el torso
     hombro.add(malla(caja(0.56, 1.5, 0.62, 0.1), mCamisa, 0, -0.72, 0));
-    hombro.add(malla(new THREE.CylinderGeometry(0.13, 0.13, 0.2, 14), mPiel, 0, -1.5, 0)); // muñeca
+    hombro.add(malla(new THREE.CylinderGeometry(0.11, 0.11, 0.26, 14), mPiel, 0, -1.55, 0)); // muñeca (pasador)
     const muneca = grupo(0, -1.66, 0);
-    const mano = malla(geometriaMano(lado), mPiel, 0, -0.08, 0);
-    muneca.add(mano);
+    muneca.add(malla(geometriaMano(lado), mPiel, 0, -0.17, 0)); // la mano cuelga justo debajo del pasador
     hombro.add(muneca);
     return { hombro, muneca };
   };
@@ -179,13 +204,15 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
   cabeza.add(malla(new THREE.CylinderGeometry(0.72, 0.72, 0.95, 40), mPiel, 0, 0.48, 0));
   cabeza.add(malla(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 24), mPiel, 0, 1.05, 0));
   const matCara = new THREE.MeshBasicMaterial({ map: texturaCara(false, false), transparent: true });
-  const cara = new THREE.Mesh(new THREE.CylinderGeometry(0.725, 0.725, 0.95, 40, 1, true, -Math.PI / 2 - 0.62, 1.24), matCara);
+  // En CylinderGeometry el ángulo 0 apunta a +z (x = sen θ, z = cos θ): la cara se centra en θ = 0 para que mire al FRENTE (+z).
+  // (Antes estaba centrada en -π/2, es decir en -x: por eso las caras salían giradas 90° respecto al cuerpo.)
+  const cara = new THREE.Mesh(new THREE.CylinderGeometry(0.725, 0.725, 0.95, 40, 1, true, -0.62, 1.24), matCara);
   cara.position.y = 0.48;
   cabeza.add(cara);
   if (gorra) {
     const mG = plastico(gorra);
     cabeza.add(malla(new THREE.SphereGeometry(0.78, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), mG, 0, 0.72, 0));
-    cabeza.add(malla(caja(1.0, 0.1, 0.8, 0.04), mG, 0, 0.78, 0.86));
+    cabeza.add(malla(caja(1.0, 0.1, 0.8, 0.04), mG, 0, 0.78, 0.86)); // visera al frente (+z)
   }
 
   torso.add(cabeza, bI.hombro, bD.hombro);
@@ -198,98 +225,125 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     fase: rnd() * Math.PI * 2,
     respira: 0.2 + rnd() * 0.07, // respiraciones por segundo
     parpadeo: 4.2 + rnd() * 2.2, // segundos entre parpadeos
+    pausaMirada: 3.2 + rnd() * 2.2, // cada cuánto echa un vistazo en reposo
+    orden: GESTOS.map((_, i) => [rnd(), i]).sort((a, b) => a[0] - b[0]).map((x) => x[1]), // orden propio de gestos
   };
 
-  // ----- estado de la animación -----
-  const P = Object.fromEntries(CAMPOS.map((c) => [c, 0])); // postura actual (ya suavizada)
-  const VEL = Object.fromEntries(CAMPOS.map((c) => [c, 0])); // velocidad de cada articulación (para arrancar y frenar con suavidad)
-  const mirada = { yaw: 0, pitch: 0, hasta: 1.2 + rnd() * 1.5 }; // mirada de reposo: cambia de punto cada pocos segundos
-  const PUNTOS = [[-0.5, 0.04], [0.45, -0.02], [0.12, 0.1], [0.0, 0.0], [0.65, 0.06], [-0.28, -0.1]];
-  let ultimoPunto = -1;
+  // ----- estado de la animación (objetos reutilizados: nada se crea en cada cuadro) -----
+  const P = {}; // postura actual (ya suavizada)
+  const VEL = {}; // velocidad de cada articulación (para arrancar y frenar con suavidad)
+  const T = {}; // postura deseada
+  const rap = { mI: 0, mD: 0 }; // movimientos finos y rápidos (tecleo) que se suman después de suavizar
+  const salida = { bocaAbierta: false, k: 7 };
+  for (const c of CAMPOS) P[c] = VEL[c] = T[c] = 0;
+  const mirada = { fase: 'frente', yaw: 0, pitch: 0, hasta: 1.5 };
+  let ultimoVistazo = -1;
   let blanco = null; // punto del mundo al que mira (opcional)
   let estadoAnt = null;
   let t0 = 0;
   let terminado = false;
-  const v3 = new THREE.Vector3();
+  const va = new THREE.Vector3();
+  const vb = new THREE.Vector3();
 
   const mirarA = (p) => {
-    blanco = p ? p.clone() : null;
+    blanco = p ? (blanco || new THREE.Vector3()).copy(p) : null;
   };
 
-  /** Ángulos de cabeza (yaw, pitch) necesarios para mirar al punto del mundo, relativos al cuerpo. */
-  function haciaBlanco() {
-    cabeza.getWorldPosition(v3);
-    const local = raiz.worldToLocal(blanco.clone());
-    const d = local.sub(raiz.worldToLocal(v3));
-    return [limitar(Math.atan2(d.x, d.z), -0.9, 0.9), limitar(-Math.atan2(d.y, Math.hypot(d.x, d.z)), -0.3, 0.3)];
-  }
+  /** Yaw y pitch de cabeza necesarios para mirar al punto del mundo, relativos al cuerpo (yaw 0 = al frente). */
+  const haciaBlanco = (out) => {
+    cabeza.getWorldPosition(va);
+    va.y += 0.48;
+    raiz.worldToLocal(va);
+    vb.copy(blanco);
+    raiz.worldToLocal(vb).sub(va);
+    out[0] = limitar(Math.atan2(vb.x, vb.z), -0.9, 0.9);
+    out[1] = limitar(-Math.atan2(vb.y, Math.hypot(vb.x, vb.z)), -0.3, 0.3);
+  };
+  const angulos = [0, 0];
 
-  /** Postura deseada y movimientos finos (rápidos) que se suman después de suavizar. */
+  /** Postura deseada (T) y movimientos finos (rap) para el estado actual. */
   function objetivo(estado, t, tt) {
-    const T = Object.fromEntries(CAMPOS.map((c) => [c, 0]));
+    for (const c of CAMPOS) T[c] = 0;
     T.bIa = 0.07;
     T.bDa = 0.07;
+    rap.mI = rap.mD = 0;
     const f = v.ritmo;
     const ph = v.fase;
-    const rapido = { mI: 0, mD: 0 };
-    let k = 7; // rapidez con la que la postura alcanza el objetivo
-    let bocaAbierta = false;
+    let k = 7; // rapidez general con la que la postura alcanza el objetivo
+    let boca = false;
 
     switch (estado) {
-      case 'thinking': // teclea mirando la pantalla, con pequeños vistazos
-        T.bIx = -1.12;
-        T.bDx = -1.12;
+      case 'thinking': {
+        // teclea mirando la pantalla; cada tanto levanta la vista un momento (piensa) y vuelve a teclear
+        const ciclo = (t * 0.13 * f + ph / 6.2832) % 1;
+        const pausa = ciclo > 0.8 ? suave(Math.min(1, (ciclo - 0.8) / 0.05)) * (1 - suave(Math.max(0, (ciclo - 0.95) / 0.05))) : 0;
+        T.bIx = -1.12 + 0.12 * pausa;
+        T.bDx = -1.12 + 0.12 * pausa;
         T.bIa = 0.12;
         T.bDa = 0.12;
         T.mI = -0.22;
         T.mD = -0.22;
-        T.cabX = 0.16;
-        T.cabY = 0.22 * Math.sin(t * 0.55 * f + ph);
-        T.torX = 0.05;
-        rapido.mI = 0.1 * Math.sin(t * 28 * f);
-        rapido.mD = 0.1 * Math.sin(t * 28 * f + 2.1);
+        T.cabX = 0.16 - 0.32 * pausa;
+        T.cabY = 0.12 * Math.sin(t * 0.55 * f + ph) + 0.3 * pausa;
+        T.torX = 0.05 - 0.04 * pausa;
+        T.torY = T.cabY * 0.3;
+        const teclea = 1 - pausa;
+        rap.mI = 0.1 * Math.sin(t * 28 * f) * teclea;
+        rap.mD = 0.1 * Math.sin(t * 28 * f + 2.1) * teclea;
         break;
+      }
       case 'searching': // recorre varias pantallas con la mirada y señala con una mano
         T.bIx = -0.5;
-        T.bDx = -1.2;
+        T.bDx = -1.2 + 0.1 * Math.sin(t * 1.4 * f);
         T.bDa = 0.15;
         T.mD = -0.2;
         T.cabX = 0.1;
         T.cabY = 0.5 * Math.sin(t * 0.7 * f + ph);
-        T.torY = 0.12 * Math.sin(t * 0.7 * f + ph);
-        T.bDx += 0.1 * Math.sin(t * 1.4 * f);
+        T.torY = T.cabY * 0.35; // el torso acompaña a la cabeza, con menos recorrido
+        T.torZ = 0.03 * Math.sin(t * 0.7 * f + ph);
         break;
       case 'talking': {
-        // gestos en ciclos: levantar, abrir, enfatizar. Frecuencias bajas y distintas entre sí para que no se vea mecánico.
-        const p = t * 1.7 * f + ph;
-        T.bDx = -0.75 + 0.35 * Math.sin(p) + 0.12 * Math.sin(2.3 * p + 1);
-        T.bDa = 0.35 + 0.22 * Math.sin(0.7 * p) * v.amp;
-        T.mD = 0.3 * Math.sin(1.9 * p);
-        T.bIx = -0.25 + 0.2 * Math.sin(p * 0.8 + 1.7);
-        T.bIa = 0.18 + 0.1 * Math.sin(p * 0.6);
-        T.mI = 0.15 * Math.sin(1.4 * p + 0.8);
-        T.cabX = 0.05 * Math.sin(p * 2.2) - 0.02;
-        T.cabY = 0.12 * Math.sin(p * 0.5);
-        T.torY = 0.06 * Math.sin(p * 0.5 + 0.6);
-        T.cabZ = 0.04 * Math.sin(p * 0.9);
-        bocaAbierta = Math.sin(t * 5.3 * f + ph) * Math.sin(t * 1.3 + 0.7) > 0.12;
+        // Habla a "golpes" (beats): en cada uno la cabeza asiente, un instante después el brazo marca el acento.
+        // Cada dos golpes cambia el gesto de las manos, en el orden propio del personaje.
+        const periodo = 1.2 / f;
+        const p = t / periodo + ph / 6.2832;
+        const idx = Math.floor(p);
+        const u = p - idx;
+        const cabeceo = Math.exp(-(((u - 0.2) / 0.16) ** 2));
+        const acento = Math.exp(-(((u - 0.38) / 0.2) ** 2));
+        const g = GESTOS[v.orden[Math.floor(idx / 2) % GESTOS.length]];
+        T.bDx = g.bDx - 0.22 * acento * v.amp;
+        T.bDa = g.bDa + 0.08 * acento * v.amp;
+        T.bIx = g.bIx - 0.12 * acento * v.amp;
+        T.bIa = g.bIa;
+        T.mD = 0.28 * acento - 0.05;
+        T.mI = 0.12 * acento;
+        T.cabX = -0.02 + 0.1 * cabeceo;
+        T.cabY = 0.1 * Math.sin(p * 0.37);
+        T.cabZ = 0.05 * Math.sin(p * 0.23 + 1);
+        T.torX = 0.03 + 0.04 * cabeceo;
+        T.torY = T.cabY * 0.45;
+        T.torZ = 0.025 * Math.sin(p * 0.37);
+        boca = Math.sin(t * 5.3 * f + ph) * Math.sin(t * 1.3 + 0.7) > 0.12;
         break;
       }
       case 'walking': {
         const w = t * 7.2 * f;
-        T.bIx = Math.sin(w) * 0.6;
-        T.bDx = -Math.sin(w) * 0.6;
-        T.pI = -Math.sin(w) * 0.45;
-        T.pD = Math.sin(w) * 0.45;
-        T.torY = Math.sin(w) * 0.07;
-        T.cabY = -Math.sin(w) * 0.03;
-        T.alto = Math.abs(Math.sin(w)) * 0.07;
+        const s = Math.sin(w);
+        T.bIx = s * 0.6;
+        T.bDx = -s * 0.6;
+        T.pI = -s * 0.45;
+        T.pD = s * 0.45;
+        T.torY = s * 0.08; // el torso gira contra las piernas
+        T.cabY = -s * 0.04; // y la cabeza compensa para mirar al frente
+        T.torZ = 0.035 * Math.sin(w * 0.5);
+        T.alto = (1 - Math.cos(2 * w)) * 0.035;
         k = 9;
         break;
       }
       case 'saludo': {
         // 0–0.6 s sube el brazo, hasta 3.7 s saluda moviendo la mano, después baja
-        let arriba = 0;
+        let arriba;
         if (tt < 0.6) arriba = suave(tt / 0.6);
         else if (tt < 3.7) arriba = 1;
         else arriba = 1 - suave(Math.min(1, (tt - 3.7) / 0.6));
@@ -299,10 +353,11 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         const m = tt > 0.6 && tt < 3.7 ? 1 : 0;
         T.rD = 0.5 * onda * m;
         T.bDa += 0.1 * onda * m;
-        T.cabY = 0.25 * arriba;
+        T.cabY = 0.2 * arriba; // gira un poco hacia quien saluda y vuelve al frente al bajar el brazo
         T.cabZ = 0.07 * arriba;
-        T.cabX = -0.04 * arriba;
-        bocaAbierta = arriba > 0.9 && onda > 0.6;
+        T.torZ = -0.05 * arriba; // se inclina levemente para compensar el peso del brazo
+        T.torY = 0.06 * arriba;
+        boca = arriba > 0.9 && onda > 0.6;
         k = 8;
         break;
       }
@@ -315,52 +370,66 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.cabX = 0.03 + asiente;
         T.torX = 0.05;
         T.torY = 0.1;
+        T.torZ = 0.02;
         T.bDx = -0.12;
         T.bDa = 0.1;
         k = 5;
         break;
       }
       default: {
-        // reposo: respira y de vez en cuando mira a otro lado. Si hay un punto de interés, lo mantiene en la mirada.
-        if (!blanco && t >= mirada.hasta) {
+        // Reposo: mira al FRENTE. De vez en cuando echa un vistazo corto a un lado y vuelve al frente.
+        if (mirada.fase === 'frente' && t >= mirada.hasta) {
           let i;
-          do i = Math.floor(rnd() * PUNTOS.length);
-          while (i === ultimoPunto);
-          ultimoPunto = i;
-          mirada.yaw = PUNTOS[i][0];
-          mirada.pitch = PUNTOS[i][1];
-          mirada.hasta = t + 2 + rnd() * 3;
+          do i = Math.floor(rnd() * VISTAZOS.length);
+          while (i === ultimoVistazo);
+          ultimoVistazo = i;
+          mirada.fase = 'lado';
+          mirada.yaw = VISTAZOS[i][0];
+          mirada.pitch = VISTAZOS[i][1];
+          mirada.hasta = t + 1.1 + rnd() * 1.1;
+        } else if (mirada.fase === 'lado' && t >= mirada.hasta) {
+          mirada.fase = 'frente';
+          mirada.yaw = mirada.pitch = 0;
+          mirada.hasta = t + v.pausaMirada + rnd() * 3;
         }
+        const desc = Math.sin(t * 0.13 * f + ph); // cambio de peso lento de una pierna a otra
         T.cabY = mirada.yaw;
         T.cabX = mirada.pitch;
-        T.torY = mirada.yaw * 0.2;
-        T.bIx = 0.04 * Math.sin(t * v.respira * 6.28 + ph);
-        T.bDx = -0.04 * Math.sin(t * v.respira * 6.28 + ph);
+        T.torY = mirada.yaw * 0.25;
+        T.torZ = 0.03 * desc;
+        T.cabZ = -0.02 * desc;
+        T.bIx = 0.04 * Math.sin(t * v.respira * 6.2832 + ph);
+        T.bDx = -0.04 * Math.sin(t * v.respira * 6.2832 + ph);
+        T.bIa = 0.07 + 0.015 * desc;
+        T.bDa = 0.07 - 0.015 * desc;
         k = 4.5;
       }
     }
-    return { T, rapido, k, bocaAbierta };
+    salida.k = k;
+    salida.bocaAbierta = boca;
   }
 
-  function aplicar(P2, rapido, t, bocaAbierta) {
+  function aplicar(t) {
     // respiración: el pecho se ensancha un poco y la cabeza sube unos milímetros
     const r = Math.sin(t * v.respira * 6.2832 + v.fase);
     pecho.scale.set(1 + r * 0.008, 1 + r * 0.014, 1 + r * 0.008);
     cabeza.position.y = 1.76 + r * 0.02;
-    cuerpo.position.y = P2.alto;
-    torso.rotation.set(limitar(P2.torX, ...LIM.torX), limitar(P2.torY, ...LIM.torY), 0);
-    cabeza.rotation.set(limitar(P2.cabX, ...LIM.cabX), limitar(P2.cabY, ...LIM.cabY), limitar(P2.cabZ, ...LIM.cabZ));
+    cuerpo.position.y = P.alto;
+    torso.rotation.set(limitar(P.torX, ...LIM.torX), limitar(P.torY, ...LIM.torY), limitar(P.torZ, ...LIM.torZ));
+    cabeza.rotation.set(limitar(P.cabX, ...LIM.cabX), limitar(P.cabY, ...LIM.cabY), limitar(P.cabZ, ...LIM.cabZ));
     // hombro izquierdo: abducir = alejar del cuerpo (x negativo)
-    bI.hombro.rotation.set(limitar(P2.bIx, ...LIM.brazoX), 0, -limitar(P2.bIa, ...LIM.brazoAbd));
-    bD.hombro.rotation.set(limitar(P2.bDx, ...LIM.brazoX), 0, limitar(P2.bDa, ...LIM.brazoAbd));
-    bI.muneca.rotation.set(limitar(P2.mI + rapido.mI, ...LIM.muneca), 0, 0);
-    bD.muneca.rotation.set(limitar(P2.mD + rapido.mD, ...LIM.muneca), limitar(P2.rD, ...LIM.giro), 0);
-    piernaI.rotation.x = limitar(P2.pI, ...LIM.pierna);
-    piernaD.rotation.x = limitar(P2.pD, ...LIM.pierna);
+    bI.hombro.rotation.set(limitar(P.bIx, ...LIM.brazoX), 0, -limitar(P.bIa, ...LIM.brazoAbd));
+    bD.hombro.rotation.set(limitar(P.bDx, ...LIM.brazoX), 0, limitar(P.bDa, ...LIM.brazoAbd));
+    // las manos se "arrastran" un poco detrás del brazo (movimiento secundario): se doblan en contra de su velocidad
+    const arrI = limitar(-VEL.bIx * 0.06, -0.15, 0.15);
+    const arrD = limitar(-VEL.bDx * 0.06, -0.15, 0.15);
+    bI.muneca.rotation.set(limitar(P.mI + rap.mI + arrI, ...LIM.muneca), 0, 0);
+    bD.muneca.rotation.set(limitar(P.mD + rap.mD + arrD, ...LIM.muneca), limitar(P.rD, ...LIM.giro), 0);
+    piernaI.rotation.x = limitar(P.pI, ...LIM.pierna);
+    piernaD.rotation.x = limitar(P.pD, ...LIM.pierna);
     // cara: parpadeo regular y boca abierta al hablar
     const ciclo = t % v.parpadeo;
-    const cerrados = ciclo > v.parpadeo - 0.14;
-    const mapa = texturaCara(cerrados, bocaAbierta);
+    const mapa = texturaCara(ciclo > v.parpadeo - 0.14, salida.bocaAbierta);
     if (matCara.map !== mapa) matCara.map = mapa;
   }
 
@@ -369,22 +438,23 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
       estadoAnt = estado;
       t0 = t;
       terminado = false;
-      if (estado === 'idle') mirada.hasta = t + 0.8;
+      mirada.fase = 'frente'; // al volver al reposo siempre se arranca mirando al frente
+      mirada.yaw = mirada.pitch = 0;
+      mirada.hasta = t + 1.2;
     }
     const tt = t - t0;
-    const { T, rapido, k, bocaAbierta } = objetivo(estado, t, tt);
-    // mirada dirigida a un punto del mundo (hablar, escuchar o reposo con interés)
-    if (blanco && (estado === 'talking' || estado === 'escucha' || estado === 'idle')) {
-      const [yaw, pitch] = haciaBlanco();
-      T.cabY = estado === 'idle' ? yaw * 0.7 : yaw;
-      T.cabX += pitch;
-      T.torY += yaw * 0.15;
+    objetivo(estado, t, tt);
+    // mirada dirigida a un punto del mundo (hablar y escuchar); en el saludo solo se suma un giro suave
+    if (blanco && (estado === 'talking' || estado === 'escucha')) {
+      haciaBlanco(angulos);
+      T.cabY = angulos[0];
+      T.cabX += angulos[1];
+      T.torY += angulos[0] * 0.15;
     }
-    // transición suave hacia la postura deseada (la cabeza responde un poco más rápido que el resto)
+    // transición suave hacia la postura deseada: amortiguación crítica (arranca despacio, acelera y frena sin rebotes)
+    const k = salida.k;
     for (const c of CAMPOS) {
-      const kk = c.startsWith('cab') ? k * 1.2 : c === 'alto' ? k * 2 : k;
-      // amortiguación crítica: arranca despacio, acelera y frena sin pasarse (sin rebotes ni saltos de velocidad)
-      const om = kk * 0.6;
+      const om = k * RAPIDEZ[c] * 0.6;
       const x = om * dt;
       const e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
       const cambio = P[c] - T[c];
@@ -392,7 +462,7 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
       VEL[c] = (VEL[c] - om * tmp) * e;
       P[c] = T[c] + (cambio + tmp) * e;
     }
-    aplicar(P, rapido, t, bocaAbierta);
+    aplicar(t);
     if (estado === 'saludo' && tt >= DURACION.saludo && !terminado) {
       terminado = true;
       return true;
@@ -401,13 +471,34 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
   }
 
   function reposo() {
-    for (const c of CAMPOS) P[c] = VEL[c] = 0;
+    for (const c of CAMPOS) P[c] = VEL[c] = T[c] = 0;
     P.bIa = P.bDa = 0.07;
-    aplicar(P, { mI: 0, mD: 0 }, 0, false);
+    rap.mI = rap.mD = 0;
+    salida.bocaAbierta = false;
+    aplicar(0);
   }
   reposo();
 
-  return { objeto: raiz, animar, reposo, mirarA, manoDer: bD.muneca };
+  /** Ángulos reales (grados) para comprobar la orientación: cuerpo, cabeza y dirección a la que apunta la cara. */
+  function diagnostico() {
+    raiz.updateMatrixWorld(true);
+    cara.geometry.computeBoundingBox();
+    const centro = cara.geometry.boundingBox.getCenter(new THREE.Vector3());
+    const cw = cara.localToWorld(centro);
+    const hw = cabeza.getWorldPosition(new THREE.Vector3());
+    hw.y = cw.y;
+    const dir = cw.sub(hw);
+    const frente = new THREE.Vector3(0, 0, 1).transformDirection(raiz.matrixWorld);
+    const deg = (a) => (a * 180) / Math.PI;
+    return {
+      cuerpo: deg(Math.atan2(frente.x, frente.z)),
+      cara: deg(Math.atan2(dir.x, dir.z)),
+      cabezaRelativa: deg(cabeza.rotation.y),
+      caraRelativaAlCuerpo: deg(Math.atan2(dir.x, dir.z) - Math.atan2(frente.x, frente.z)),
+    };
+  }
+
+  return { objeto: raiz, animar, reposo, mirarA, manoDer: bD.muneca, diagnostico };
 }
 
 registrarModelo('minifigura', minifigura);

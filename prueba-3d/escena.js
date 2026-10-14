@@ -71,12 +71,12 @@ export function construirEscena() {
   const nico = crearModelo('minifigura', { camisa: PALETA.naranja, gorra: PALETA.naranja, semilla: 3 });
   nico.objeto.position.set(dx - 1.6, 0.4, dz + 1.5);
   nico.objeto.scale.setScalar(0.85);
-  nico.objeto.rotation.y = Math.PI / 2; // mira al escritorio
+  nico.objeto.rotation.y = 0.55; // el frente (+z) del personaje apunta hacia la cámara de la vista isométrica (≈0.79 rad)
   mundo.add(nico.objeto);
   const alex = crearModelo('minifigura', { camisa: PALETA.azul, pantalon: '#2b2f3a', semilla: 11 });
   alex.objeto.position.set(9.5, 0.4, 12.5);
   alex.objeto.scale.setScalar(0.85);
-  alex.objeto.rotation.y = -0.7;
+  alex.objeto.rotation.y = 0.95;
   mundo.add(alex.objeto);
 
   mundo.position.set(-N / 2, 0, -N / 2); // centrado en el origen
