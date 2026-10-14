@@ -42,6 +42,9 @@ export const DEFAULTS = {
     groqKnownModels: [],
     groqMeetings: true, // turnos de los agentes en la sala de juntas
     groqFallback: true, // respaldo cuando Gemini llega al límite
+    skillsOff: [], // ids de skills desactivadas
+    skillsPinned: [], // ids de skills que siempre se cargan
+    customSkills: [], // skills creadas por Kike
   },
   boss: {
     name: 'Kike',

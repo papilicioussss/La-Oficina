@@ -31,7 +31,7 @@ export function isBusy(agentId) {
   return !!runtime.aborters[agentId];
 }
 
-export async function sendToAgent(agentId, text, images = []) {
+export async function sendToAgent(agentId, text, images = [], opts = {}) {
   if (isBusy(agentId)) {
     toast(`${agentName(agentId)} todavía está respondiendo. Espera o detén la respuesta.`, 'warn');
     return;
@@ -54,6 +54,7 @@ export async function sendToAgent(agentId, text, images = []) {
       history,
       text,
       images,
+      forcedSkills: opts.skills || [],
       signal: ctrl.signal,
       onText: (t) => {
         reply.text = t;
@@ -68,6 +69,7 @@ export async function sendToAgent(agentId, text, images = []) {
     reply.text = res.text;
     reply.sources = res.sources;
     if (res.via) reply.via = res.via;
+    reply.skills = res.skills || [];
     if (!reply.text.trim()) reply.error = 'No llegó respuesta. Intenta de nuevo.';
   } catch (e) {
     if (e.name === 'AbortError') {

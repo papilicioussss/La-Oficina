@@ -22,6 +22,7 @@ export const runtime = {
   location: Object.fromEntries(AGENT_IDS.map((id) => [id, 'office'])),
   aborters: {}, // AbortController por agente / reunión
   drafts: {}, // borradores del cuadro de texto por agente
+  forcedSkills: {}, // skills elegidas a mano para el próximo mensaje de cada agente
   meetingDraft: null, // tema precargado para la sala de juntas
   activeMeetingId: null,
   meetingBusy: false,

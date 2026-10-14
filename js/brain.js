@@ -6,6 +6,7 @@ import { groqChat, groqJSON, GroqError } from './groq.js';
 import { tavilySearch, toTimeRange, SearchUnavailable, SearchError } from './search.js';
 import { buildSystemPrompt, SEARCH_TOOL, ROLES, agentName, bossName, today } from './prompts.js';
 import { runtime } from './state.js';
+import { pickSkills, skillNames } from './skills.js';
 import { toast } from './ui.js';
 
 export class SetupError extends Error {}
@@ -85,8 +86,11 @@ function blockTavily(e) {
  * history: mensajes previos [{role:'user'|'model', text}]
  * Devuelve { text, sources }.
  */
-export async function runAgent({ agentId, history, text, images = [], onText, onStatus, signal }) {
+export async function runAgent({ agentId, history, text, images = [], forcedSkills = [], onText, onStatus, signal }) {
   const s = requireKey();
+  const recentUser = history.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
+  const skills = pickSkills(agentId, `${text} ${recentUser}`, forcedSkills);
+  const skillLabels = skillNames(skills);
   const contents = history
     .filter((m) => m.text && !m.pending && !m.error)
     .slice(-24)
@@ -97,7 +101,7 @@ export async function runAgent({ agentId, history, text, images = [], onText, on
   });
 
   const attempt = async (provider) => {
-    const system = buildSystemPrompt(agentId, { searchAvailable: !!provider });
+    const system = buildSystemPrompt(agentId, { searchAvailable: !!provider, skills });
     const tools = toolsFor(provider);
     const convo = [...contents];
     const sources = [];
@@ -116,7 +120,7 @@ export async function runAgent({ agentId, history, text, images = [], onText, on
         onText: (t) => onText?.(prefix + t),
       });
       if (provider === 'google') groundingSources(res.grounding, sources);
-      if (!res.functionCalls.length || last) return { text: prefix + res.text, sources };
+      if (!res.functionCalls.length || last) return { text: prefix + res.text, sources, skills: skillLabels };
 
       if (res.text.trim()) prefix += res.text.trim() + '\n\n';
       convo.push({ role: 'model', parts: res.parts });
@@ -148,7 +152,7 @@ export async function runAgent({ agentId, history, text, images = [], onText, on
       }
       convo.push({ role: 'user', parts: responses });
     }
-    return { text: prefix, sources };
+    return { text: prefix, sources, skills: skillLabels };
   };
 
   const provider = searchProvider();
@@ -170,12 +174,12 @@ export async function runAgent({ agentId, history, text, images = [], onText, on
       const reply = await groqChat({
         apiKey: s.groqKey,
         model: s.groqModel,
-        system: buildSystemPrompt(agentId, { searchAvailable: false }),
+        system: buildSystemPrompt(agentId, { searchAvailable: false, skills }),
         messages: contents.map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
         signal,
         onText,
       });
-      return { text: reply, sources: [], via: 'groq' };
+      return { text: reply, sources: [], via: 'groq', skills: skillLabels };
     } catch (g) {
       if (g.name === 'AbortError') throw g;
       noteGroqFailure(g);
@@ -313,10 +317,16 @@ export async function research({ meeting, focus, signal, onStatus }) {
  * Gemini) y cae en Gemini si Groq falla, o al revés si Gemini llegó al límite.
  * Devuelve { text, via }.
  */
+function meetingQuery(m) {
+  const lastBoss = [...m.turns].reverse().find((t) => t.speaker === 'kike' && t.text)?.text || '';
+  return [m.topic, m.format, m.goal, m.destination, lastBoss].filter(Boolean).join(' ');
+}
+
 export async function meetingTurn({ meeting, agentId, onText, signal }) {
   const s = requireKey();
+  const skills = pickSkills(agentId, meetingQuery(meeting));
   const system =
-    buildSystemPrompt(agentId, { meeting: true }) +
+    buildSystemPrompt(agentId, { meeting: true, skills }) +
     `\n\n## Estás en la SALA DE JUNTAS
 Estás reunido con ${bossName()} (tu jefe, que dirige la reunión) y tus compañeros para crear contenido. Si ${bossName()} aportó algo, tómalo en cuenta primero. Habla en primera persona como en una reunión real: breve (máximo unas 170 palabras), sin repetir lo que ya se dijo. Construye sobre las ideas de los demás o discrepa con argumentos. Apóyate en la investigación cuando aplique y menciona la fuente entre paréntesis. Termina con una propuesta concreta desde tu área. No armes el plan completo: eso se hace al cierre.`;
   const user = `${meetingBrief(meeting)}
@@ -325,7 +335,8 @@ TRANSCRIPCIÓN HASTA AHORA:
 ${transcript(meeting) || '(Eres el primero en hablar.)'}
 
 Tu turno, ${agentName(agentId)}. Aporta desde tu área: ${ROLES[agentId].meetingFocus}`;
-  return dualGenerate({ system, user, signal, onText, preferGroq: s.groqMeetings });
+  const res = await dualGenerate({ system, user, signal, onText, preferGroq: s.groqMeetings });
+  return { ...res, skills: skillNames(skills) };
 }
 
 /** Genera texto con Groq o Gemini según preferencia, usando el otro como respaldo. */
@@ -363,8 +374,11 @@ async function dualGenerate({ system, user, signal, onText, preferGroq }) {
 /** Cierre de la reunión: plan de contenido final. */
 export async function meetingPlan({ meeting, onText, signal }) {
   requireKey();
+  // El moderador usa las habilidades de guion y de copy que pida el tema.
+  const query = meetingQuery(meeting);
+  const skills = [...pickSkills('guion', query), ...pickSkills('copy', query).filter((s) => !s.core)].slice(0, 6);
   const system =
-    buildSystemPrompt('guion', { meeting: true }) +
+    buildSystemPrompt('guion', { meeting: true, skills }) +
     '\n\n## Ahora moderas el cierre de la reunión\nTu trabajo es convertir la conversación en un plan claro, accionable y listo para grabar y publicar. Respeta las ideas acordadas y resuelve contradicciones eligiendo la opción con mejor argumento.';
   const names = meeting.participants.map((id) => `${agentName(id)} (${ROLES[id].title})`).join(', ');
   const user = `${meetingBrief(meeting)}
@@ -384,7 +398,8 @@ Redacta el PLAN DE CONTENIDO final con estas secciones (Markdown):
 ## Cuándo y dónde publicar (Instagram / TikTok)
 ## Cómo lo vamos a medir (qué métrica y qué número nos diría que funcionó)
 ## Pendientes para ${bossName()} (lista corta)`;
-  return dualGenerate({ system, user, signal, onText, preferGroq: false });
+  const res = await dualGenerate({ system, user, signal, onText, preferGroq: false });
+  return { ...res, skills: skillNames(skills) };
 }
 
 // ---------------- Métricas desde captura ----------------

@@ -1,6 +1,7 @@
 // Panel de cada oficina: chat con el agente (y pestaña de métricas para el Analista).
 
-import { h, toast, copyText, fileToImagePart, isTouch, confirmDialog, domainOf } from './ui.js';
+import { h, toast, copyText, fileToImagePart, isTouch, confirmDialog, domainOf, openModal } from './ui.js';
+import { skillsFor, isEnabled } from './skills.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
@@ -91,6 +92,7 @@ function msgEl(agentId, m) {
       m.via === 'groq' ? h('span', { class: 'via-badge', title: 'Gemini llegó al límite: respondió Groq (sin búsqueda web)' }, '⚡ Groq') : null
     )
   );
+  if (m.skills?.length) el.append(h('div', { class: 'skills-line', title: 'Habilidades de marketing que usó para esta respuesta' }, '🛠 ', m.skills.join(' · ')));
   if (m.pending && m.status) el.append(h('div', { class: 'msg-status' }, m.status));
   if (m.text) el.append(h('div', { class: 'md', html: md(m.text) }));
   else if (m.pending) el.append(typing());
@@ -268,6 +270,73 @@ function chatView(agentId) {
     renderWebChip();
   });
 
+  // Habilidades: se eligen solas según lo que pides; aquí puedes forzar alguna para el próximo mensaje.
+  const skillsChip = h('button', { class: 'chip', type: 'button' });
+  const renderSkillsChip = () => {
+    const n = (runtime.forcedSkills[agentId] || []).length;
+    skillsChip.textContent = n ? `🛠 Skills (${n})` : '🛠 Skills';
+    skillsChip.setAttribute('aria-pressed', String(!!n));
+    skillsChip.title = 'Elige habilidades de marketing para tu próximo mensaje (si no eliges, se activan solas según lo que pidas)';
+  };
+  skillsChip.addEventListener('click', () => {
+    const chosen = new Set(runtime.forcedSkills[agentId] || []);
+    const list = skillsFor(agentId).filter((x) => !x.core && isEnabled(x.id));
+    const body = h(
+      'div',
+      null,
+      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Se activan solas según lo que escribas. Marca las que quieras que use sí o sí en tu próximo mensaje (máximo 4).'),
+      h(
+        'div',
+        { class: 'radio-cards' },
+        list.map((x) =>
+          h(
+            'label',
+            { class: 'radio-card' },
+            h('input', {
+              type: 'checkbox',
+              checked: chosen.has(x.id),
+              onChange: (e) => {
+                if (e.target.checked) {
+                  if (chosen.size >= 4) {
+                    e.target.checked = false;
+                    toast('Máximo 4 skills a la vez.', 'warn', 2000);
+                    return;
+                  }
+                  chosen.add(x.id);
+                } else chosen.delete(x.id);
+              },
+            }),
+            h('span', null, h('strong', null, `${x.icon} ${x.name}`), h('small', null, x.desc))
+          )
+        )
+      )
+    );
+    openModal({
+      title: `🛠 Skills de ${store.agents()[agentId].name}`,
+      body,
+      actions: [
+        {
+          label: 'Quitar selección',
+          kind: 'ghost',
+          onClick: (close) => {
+            runtime.forcedSkills[agentId] = [];
+            renderSkillsChip();
+            close();
+          },
+        },
+        {
+          label: 'Listo',
+          kind: 'primary',
+          onClick: (close) => {
+            runtime.forcedSkills[agentId] = [...chosen];
+            renderSkillsChip();
+            close();
+          },
+        },
+      ],
+    });
+  });
+
   const sendBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'submit' });
   const renderSend = () => {
     const busy = isBusy(agentId);
@@ -292,7 +361,10 @@ function chatView(agentId) {
     textarea.value = '';
     runtime.drafts[agentId] = '';
     autoGrow();
-    sendToAgent(agentId, text, imgs);
+    const skills = runtime.forcedSkills[agentId] || [];
+    runtime.forcedSkills[agentId] = [];
+    renderSkillsChip();
+    sendToAgent(agentId, text, imgs, { skills });
   };
 
   const form = h(
@@ -315,6 +387,7 @@ function chatView(agentId) {
         '📎 Imagen'
       ),
       fileInput,
+      skillsChip,
       webChip,
       h('span', { class: 'spacer' }),
       sendBtn
@@ -325,6 +398,7 @@ function chatView(agentId) {
   renderAll();
   renderAttachments();
   renderWebChip();
+  renderSkillsChip();
   renderSend();
   requestAnimationFrame(autoGrow);
 

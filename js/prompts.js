@@ -3,6 +3,7 @@
 import * as store from './store.js';
 import { digest } from './metrics-calc.js';
 import { memoryText, gaps, MEM_CATS, facts } from './memory.js';
+import { pickSkills, skillsPrompt } from './skills.js';
 
 export const ROLES = {
   copy: {
@@ -134,7 +135,7 @@ export function agentName(id) {
   return store.agents()[id]?.name || ROLES[id].title;
 }
 
-export function buildSystemPrompt(id, { searchAvailable = false, meeting = false } = {}) {
+export function buildSystemPrompt(id, { searchAvailable = false, meeting = false, skills } = {}) {
   const a = store.agents()[id];
   const role = ROLES[id];
   const marca = store.brief().marca || 'la marca';
@@ -158,6 +159,10 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
 - Usa Markdown simple: títulos cortos, viñetas, **negritas** y tablas cuando ayuden.`,
     role.expertise,
   ];
+
+  // Habilidades de marketing (las básicas siempre; el resto según la consulta)
+  const skillBlock = skillsPrompt(skills || pickSkills(id, ''));
+  if (skillBlock) parts.push(skillBlock);
 
   if (searchAvailable) {
     parts.push(

@@ -121,6 +121,7 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
         });
         m.plan = res.text;
         m.planVia = res.via;
+        m.planSkills = res.skills || [];
       } finally {
         m.planPending = false;
         setStatus(mod, 'meeting');
@@ -144,6 +145,7 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
           });
           t.text = res.text;
           t.via = res.via;
+          t.skills = res.skills || [];
           if (!t.text.trim()) t.error = 'No respondió. Intenta otra ronda.';
         } catch (e) {
           if (e.name !== 'AbortError') t.error = e.message;
@@ -375,6 +377,7 @@ function turnEl(m, t) {
   const a = agents[t.speaker];
   const el = h('div', { class: `turn${t.error ? ' msg-error' : ''}`, 'data-turn': t.id });
   el.append(h('div', { class: 'turn-head' }, avatarSvg(a.look), a.name, h('small', null, ROLES[t.speaker].title), viaBadge(t.via)));
+  if (t.skills?.length) el.append(h('div', { class: 'skills-line' }, '🛠 ', t.skills.join(' · ')));
   if (t.text) el.append(h('div', { class: 'md', html: md(t.text) }));
   else if (t.pending) el.append(h('div', { class: 'typing' }, h('i'), h('i'), h('i')));
   if (t.error) el.append(h('p', null, '⚠️ ', t.error));
@@ -391,6 +394,7 @@ function planEl(m) {
     'div',
     { class: 'turn turn-plan', 'data-plan': '1' },
     h('div', { class: 'turn-head' }, '📋 Plan de contenido', viaBadge(m.planVia)),
+    m.planSkills?.length ? h('div', { class: 'skills-line' }, '🛠 ', m.planSkills.join(' · ')) : null,
     m.plan ? h('div', { class: 'md', html: md(m.plan) }) : h('div', { class: 'typing' }, h('i'), h('i'), h('i')),
     !m.planPending && m.plan
       ? h(

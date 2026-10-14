@@ -8,6 +8,7 @@ Oficina virtual isométrica con **3 agentes de IA** que te ayudan con el conteni
 | 📊 Análisis | Analista | Tendencias de TikTok e Instagram (con búsqueda web) y análisis de tus métricas cargadas a mano o desde capturas de Insights / TikTok Analytics. |
 | 🎬 Guiones | Guionista y estratega | Guiones para Reels y TikTok (tabla de tomas, texto en pantalla y voz), análisis y mejora de tus guiones, series y carruseles. |
 | 🤝 Sala de juntas | Los tres | Lluvia de ideas: investigan en la web lo más reciente, cada uno aporta desde su área, tú opinas y al final arman un **plan de contenido** listo para grabar. |
+| 🐱 Tu gato asistente | Mascota y memoria | Un gato amarillo que vive en tu oficina. Conversas con él y guarda (o corrige) precios, destinos, identidad de la marca en redes, público y operación; los tres agentes leen esa memoria. |
 | 👑 Tu oficina | Tú (el jefe) | Tu avatar: camina hasta el agente que tocas para consultarle y preside las reuniones desde la cabecera. |
 
 La app **no hace** documentos, edición de video, flyers ni identidad visual: solo texto, guiones y análisis.
@@ -47,6 +48,27 @@ La app **no hace** documentos, edición de video, flyers ni identidad visual: so
 - En cada respuesta tienes: **Copiar** (texto limpio para pegar en IG/TikTok), **➡️ Pasar a otro agente** y **🤝 Llevar a la sala de juntas**.
 - **📈 Métricas** (pestaña del Analista): registra cada publicación a mano o con **📷 Rellenar desde captura**. Verás promedios, un gráfico y la tabla; luego toca **Analizar** para que el Analista te diga qué hacer la próxima semana.
 - **🤝 Sala de juntas**: describe qué necesitas, elige formato y objetivo, y convoca. Los personajes caminan a la sala, se investiga en la web y cada uno opina. Puedes meter tu aporte, pedir otra ronda y al final **✅ Armar el plan**.
+
+## El gato y la memoria de la marca
+
+- **Primer toque:** el gato te pide un nombre (lo cambias en Configuración → Equipo).
+- **Habla con él como con una persona:** te hace preguntas para completar lo que falta, o tú le cuentas cosas ("el full day a Morrocoy cuesta $45 por persona…") y las guarda solo. También puedes mandarle la foto de una lista de precios. Cada dato guardado aparece en el chat con un botón **Deshacer**.
+- **Memoria:** en Configuración → 🧠 Memoria ves, editas, agregas o borras todo lo que sabe, ordenado por categorías.
+- **Copy, Analista y Guionista leen esa memoria** en cada respuesta y dejan de inventar precios o datos.
+- El gato vive su vida: duerme en su camita o sobre tu escritorio, pasea por las otras salas y viene a escucharte cuando lo tocas.
+- Guardar datos requiere Gemini (usa llamadas a funciones). Si Gemini llega a su límite y tienes Groq, el gato sigue conversando y extrae los datos aparte.
+
+## Habilidades (skills) de marketing
+
+Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psicología del consumidor, ofertas, WhatsApp y cierre, community, stories, tendencias, algoritmos, métricas, medición de ventas, competencia, público, pruebas A/B, estacionalidad, informes, estructura de guiones, formatos de turismo, storytelling, calendario editorial, series, análisis de guiones, creadores e influencers, lanzamientos, reutilización de contenido, SEO social y más.
+
+- **Se activan solas** según lo que pidas (máximo 3 a la vez, más las básicas), así gastas pocos tokens. En cada respuesta ves cuáles usó (🛠).
+- **Puedes elegirlas a mano** con el botón "🛠 Skills" del chat.
+- En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
+
+## Identidad de marca
+
+Los colores y el logo de Vacilando Ando están en toda la app (barra, íconos, oficina y modo oscuro). El logo está en `assets/`.
 
 ## Tus datos y tus claves
 
@@ -92,6 +114,12 @@ js/brain.js           llamadas a Gemini, búsqueda web y sala de juntas
 js/gemini.js          cliente de la API de Gemini (streaming)
 js/search.js          cliente de Tavily
 js/groq.js            cliente de Groq (opcional: reuniones y respaldo)
+js/cat-sprite.js      dibujo del gato (poses: caminar, sentado, durmiendo)
+js/cat-brain.js       conversación del gato y guardado de datos
+js/cat-chat.js        panel del gato
+js/memory.js          memoria de la marca
+js/skills-data.js     biblioteca de skills de marketing
+js/skills.js          selección de skills según la consulta
 js/chat.js            panel de chat de cada oficina
 js/conversation.js    enviar / detener / reintentar mensajes
 js/meeting.js         sala de juntas

@@ -11,11 +11,15 @@ import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
 import { catHeadSvg } from './cat-sprite.js';
 import { MEM_CATS, facts, addFact, updateFact, removeFact, clearMemory } from './memory.js';
+import { allSkills, isEnabled, isPinned, norm } from './skills.js';
+import { SKILL_GROUPS } from './skills-data.js';
+import { uid } from './ui.js';
 
 const TABS = [
   ['claves', '🔑 Claves'],
   ['equipo', '👥 Equipo'],
   ['memoria', '🧠 Memoria'],
+  ['habilidades', '🛠️ Habilidades'],
   ['marca', '🏝️ Marca'],
   ['fuentes', '📚 Fuentes'],
   ['datos', '💾 Datos'],
@@ -666,6 +670,147 @@ function memoryTab() {
   return wrap;
 }
 
+// ---------------- Habilidades ----------------
+function toggleIn(list, id, on) {
+  const set = new Set(list);
+  if (on) set.add(id);
+  else set.delete(id);
+  return [...set];
+}
+
+function skillsTab() {
+  const s = store.settings();
+  const wrap = h('div');
+  const render = () => {
+    const nodes = [
+      h(
+        'p',
+        { class: 'note' },
+        '🛠 Cada agente tiene una biblioteca de habilidades de marketing. Las básicas van siempre; las demás se activan solas cuando lo que pides las necesita (así no gastas tokens de más). En el chat también puedes elegirlas a mano con el botón "🛠 Skills". "Siempre" las deja activas en todas las consultas de ese agente.'
+      ),
+    ];
+    for (const [agentId, label] of Object.entries(SKILL_GROUPS)) {
+      const a = store.agents()[agentId];
+      const list = allSkills().filter((x) => x.agents.includes(agentId));
+      nodes.push(h('div', { class: 'section-title' }, `${ROLES[agentId].icon} ${a.name} · ${label} (${list.length})`));
+      for (const sk of list) {
+        const on = isEnabled(sk.id);
+        const card = h(
+          'div',
+          { class: `skill-card${on ? '' : ' is-off'}` },
+          h(
+            'div',
+            { class: 'skill-head' },
+            h('span', { style: { fontSize: '20px' } }, sk.icon),
+            h('div', { class: 'grow' }, h('strong', null, sk.name, sk.core ? h('small', null, ' · básica, siempre activa') : null), h('small', null, sk.desc)),
+            sk.custom
+              ? h(
+                  'button',
+                  {
+                    class: 'icon-btn',
+                    type: 'button',
+                    'aria-label': 'Borrar skill',
+                    onClick: async () => {
+                      if (!(await confirmDialog(`¿Borrar la skill "${sk.name}"?`, { okLabel: 'Borrar', danger: true }))) return;
+                      s.customSkills = s.customSkills.filter((c) => c.id !== sk.id);
+                      store.save('settings');
+                      render();
+                    },
+                  },
+                  '🗑️'
+                )
+              : null
+          ),
+          sk.core
+            ? null
+            : h(
+                'div',
+                { class: 'switches' },
+                h(
+                  'label',
+                  null,
+                  h('input', {
+                    type: 'checkbox',
+                    checked: on,
+                    onChange: (e) => {
+                      s.skillsOff = toggleIn(s.skillsOff || [], sk.id, !e.target.checked);
+                      store.save('settings');
+                      render();
+                    },
+                  }),
+                  'Activa'
+                ),
+                h(
+                  'label',
+                  null,
+                  h('input', {
+                    type: 'checkbox',
+                    checked: isPinned(sk.id),
+                    disabled: !on,
+                    onChange: (e) => {
+                      s.skillsPinned = toggleIn(s.skillsPinned || [], sk.id, e.target.checked);
+                      store.save('settings');
+                    },
+                  }),
+                  'Siempre (gasta más tokens)'
+                )
+              ),
+          h('details', null, h('summary', { style: { cursor: 'pointer', fontWeight: 800 } }, 'Ver instrucciones'), h('pre', null, sk.text))
+        );
+        nodes.push(card);
+      }
+    }
+    nodes.push(customSkillForm(render));
+    wrap.replaceChildren(...nodes);
+  };
+  render();
+  return wrap;
+}
+
+function customSkillForm(onSaved) {
+  const s = store.settings();
+  const name = h('input', { type: 'text', maxlength: 60, placeholder: 'Ej.: Fotos para Instagram de playa' });
+  const kw = h('input', { type: 'text', placeholder: 'Palabras que la activan, separadas por coma. Ej.: foto, fotografia, playa' });
+  const text = h('textarea', { rows: 5, placeholder: 'Escribe las instrucciones como se las darías a un experto: qué debe hacer, reglas, ejemplos, qué evitar.' });
+  const agentsSel = h(
+    'div',
+    { class: 'chips' },
+    Object.entries(SKILL_GROUPS).map(([id]) =>
+      h('label', { class: 'chip' }, h('input', { type: 'checkbox', checked: true, 'data-agent': id }), store.agents()[id].name)
+    )
+  );
+  return h(
+    'div',
+    { class: 'team-card' },
+    h('strong', null, '➕ Crear tu propia skill'),
+    h('p', { class: 'hint' }, 'Para enseñarles algo específico de tu negocio. Se suma a la biblioteca y funciona igual que las demás.'),
+    field('Nombre', name),
+    field('Para qué agentes', agentsSel),
+    field('Palabras que la activan', kw, 'Si lo dejas vacío, solo se usa cuando la eliges a mano o la marcas "Siempre".'),
+    field('Instrucciones', text),
+    h(
+      'button',
+      {
+        class: 'btn btn-primary btn-sm',
+        type: 'button',
+        onClick: () => {
+          const agents = [...agentsSel.querySelectorAll('input:checked')].map((i) => i.dataset.agent);
+          if (!name.value.trim() || !text.value.trim()) return toast('Ponle nombre y escribe las instrucciones.', 'warn');
+          if (!agents.length) return toast('Elige al menos un agente.', 'warn');
+          s.customSkills = [
+            ...(s.customSkills || []),
+            { id: 'custom-' + uid(), name: name.value.trim(), agents, kw: kw.value.split(',').map((k) => norm(k).trim()).filter(Boolean), text: text.value.trim().slice(0, 4000), icon: '⭐' },
+          ];
+          store.save('settings');
+          toast('Skill creada ✔', 'ok', 2000);
+          onSaved();
+        },
+      },
+      'Guardar skill'
+    )
+  );
+}
+
 // ---------------- Marca ----------------
 const BRIEF_FIELDS = [
   ['marca', 'Nombre de la marca', 'Vacilando Ando Tours', 1],
@@ -854,7 +999,7 @@ export function renderSettings(panel, tab = 'claves') {
     { class: 'tabs', role: 'tablist' },
     TABS.map(([k, label]) => h('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(k === tab), onClick: () => go(`#/config/${k}`) }, label))
   );
-  const content = { claves: keysTab, equipo: teamTab, memoria: memoryTab, marca: brandTab, fuentes: sourcesTab, datos: dataTab }[tab]();
+  const content = { claves: keysTab, equipo: teamTab, memoria: memoryTab, habilidades: skillsTab, marca: brandTab, fuentes: sourcesTab, datos: dataTab }[tab]();
   panel.replaceChildren(head, tabs, h('div', { class: 'panel-body' }, content));
   return () => {
     store.save('settings');
