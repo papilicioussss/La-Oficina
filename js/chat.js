@@ -72,6 +72,13 @@ function msgActions(agentId, m) {
   );
 }
 
+/** Etiqueta del modelo usado cuando no fue el principal (rápido o potente). */
+export function tierBadge(m) {
+  if (m.tier === 'light' && m.via !== 'groq') return h('span', { class: 'via-badge', title: `Mensaje simple: respondió el modelo rápido (${m.model}). Gasta muy pocos tokens.` }, '⚡ rápido');
+  if (m.tier === 'heavy' && m.modelLabel === 'potente') return h('span', { class: 'via-badge', title: `Tarea grande: respondió el modelo potente (${m.model}).` }, '🧠 potente');
+  return null;
+}
+
 function msgEl(agentId, m) {
   if (m.role === 'user') {
     return h(
@@ -89,7 +96,8 @@ function msgEl(agentId, m) {
       { class: 'msg-head' },
       avatarSvg(a.look),
       a.name,
-      m.via === 'groq' ? h('span', { class: 'via-badge', title: 'Gemini llegó al límite: respondió Groq (sin búsqueda web)' }, '⚡ Groq') : null
+      m.via === 'groq' ? h('span', { class: 'via-badge', title: m.tier === 'light' ? 'Mensaje simple: respondió Groq (rápido)' : 'Gemini llegó al límite: respondió Groq (sin búsqueda web)' }, '⚡ Groq') : null,
+      tierBadge(m)
     )
   );
   if (m.skills?.length) el.append(h('div', { class: 'skills-line', title: 'Habilidades de marketing que usó para esta respuesta' }, '🛠 ', m.skills.join(' · ')));

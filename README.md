@@ -66,6 +66,12 @@ Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psi
 - **Puedes elegirlas a mano** con el botón "🛠 Skills" del chat.
 - En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
 
+## Ahorro de tokens y modelo automático
+
+- **Modelo según la tarea:** los agentes y el gato eligen solos. Un saludo o un "gracias" usa el modelo rápido (o Groq si está activo), con un prompt mínimo y sin herramientas; lo normal usa el modelo principal; las tareas grandes (planes, análisis, guiones completos, fotos, textos largos) usan el modelo potente si lo configuras en Configuración → Claves. En la respuesta ves la etiqueta ⚡ rápido o 🧠 potente.
+- **Otros ahorros:** historial recortado (los mensajes viejos se acortan), las skills y la tabla de métricas solo se cargan cuando la consulta las necesita, resultados de búsqueda más compactos y transcripciones de reunión recortadas.
+- Se puede apagar el modelo automático en Configuración → Claves.
+
 ## Identidad de marca
 
 Los colores y el logo de Vacilando Ando están en toda la app (barra, íconos, oficina y modo oscuro). El logo está en `assets/`.
@@ -120,6 +126,7 @@ js/cat-chat.js        panel del gato
 js/memory.js          memoria de la marca
 js/skills-data.js     biblioteca de skills de marketing
 js/skills.js          selección de skills según la consulta
+js/router.js          elige el modelo según la tarea y recorta el historial
 js/chat.js            panel de chat de cada oficina
 js/conversation.js    enviar / detener / reintentar mensajes
 js/meeting.js         sala de juntas

@@ -4,7 +4,8 @@ import * as store from './store.js';
 import { generate, generateJSON, ApiError } from './gemini.js';
 import { groqChat, groqJSON, GroqError } from './groq.js';
 import { tavilySearch, toTimeRange, SearchUnavailable, SearchError } from './search.js';
-import { buildSystemPrompt, SEARCH_TOOL, ROLES, agentName, bossName, today } from './prompts.js';
+import { buildSystemPrompt, buildLightPrompt, SEARCH_TOOL, ROLES, agentName, bossName, today } from './prompts.js';
+import { classify, modelFor, trimHistory } from './router.js';
 import { runtime } from './state.js';
 import { pickSkills, skillNames } from './skills.js';
 import { toast } from './ui.js';
@@ -63,7 +64,7 @@ function toolsFor(provider) {
   return undefined;
 }
 
-async function doTavily({ consulta, periodo, soloOficiales, signal, maxResults = 5 }) {
+async function doTavily({ consulta, periodo, soloOficiales, signal, maxResults = 4 }) {
   const s = store.settings();
   return tavilySearch({
     key: s.tavilyKey,
@@ -82,6 +83,41 @@ function blockTavily(e) {
 }
 
 /**
+ * Respuesta rápida y barata para mensajes simples (sin herramientas ni skills).
+ * Orden: Groq rápido (si está disponible) → Gemini rápido → Gemini principal.
+ * Devuelve { text, via, model }.
+ */
+export async function lightGenerate({ system, history, text, signal, onText, onStatus }) {
+  const s = store.settings();
+  onStatus?.('thinking');
+  const messages = [...history.map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), { role: 'user', content: text }];
+  const first = modelFor('light', { groqOk: groqReady() });
+  if (first.provider === 'groq') {
+    try {
+      const out = await groqChat({ apiKey: s.groqKey, model: first.model, system, messages, signal, onText, maxTokens: 400 });
+      return { text: out, via: 'groq', model: first.model };
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      noteGroqFailure(e);
+      onText?.('');
+    }
+  }
+  requireKey();
+  const contents = messages.map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
+  const lite = s.fastModel || s.model;
+  try {
+    const r = await generate({ apiKey: s.geminiKey, model: lite, system, contents, signal, onText });
+    return { text: r.text, via: 'gemini', model: lite };
+  } catch (e) {
+    // Si el modelo rápido no existe o no responde, se usa el principal.
+    if (e.name === 'AbortError' || lite === s.model || !(e instanceof ApiError) || ![400, 404, 429, 500, 503].includes(e.status)) throw e;
+    onText?.('');
+    const r = await generate({ apiKey: s.geminiKey, model: s.model, system, contents, signal, onText });
+    return { text: r.text, via: 'gemini', model: s.model };
+  }
+}
+
+/**
  * Conversación con un agente en su oficina.
  * history: mensajes previos [{role:'user'|'model', text}]
  * Devuelve { text, sources }.
@@ -91,10 +127,22 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
   const recentUser = history.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
   const skills = pickSkills(agentId, `${text} ${recentUser}`, forcedSkills);
   const skillLabels = skillNames(skills);
-  const contents = history
-    .filter((m) => m.text && !m.pending && !m.error)
-    .slice(-24)
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+
+  // Router: según lo que pide, usa el modelo más rápido, el normal o el potente.
+  const { tier } = classify({ text, images: images.length, forced: forcedSkills.length, matches: pickSkills(agentId, text, []).filter((x) => !x.core).length, names: [store.agents()[agentId].name] });
+  if (tier === 'light') {
+    const res = await lightGenerate({
+      system: buildLightPrompt(agentId),
+      history: trimHistory(history, 'light'),
+      text,
+      signal,
+      onText,
+      onStatus,
+    });
+    return { text: res.text, sources: [], via: res.via === 'groq' ? 'groq' : undefined, skills: [], tier, model: res.model };
+  }
+  const chosen = modelFor(tier);
+  const contents = trimHistory(history, tier).map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
   contents.push({
     role: 'user',
     parts: [{ text: text || 'Revisa la imagen adjunta.' }, ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))],
@@ -111,7 +159,7 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
       onStatus?.('thinking');
       const res = await generate({
         apiKey: s.geminiKey,
-        model: s.model,
+        model: chosen.model,
         system,
         contents: convo,
         tools,
@@ -120,7 +168,7 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
         onText: (t) => onText?.(prefix + t),
       });
       if (provider === 'google') groundingSources(res.grounding, sources);
-      if (!res.functionCalls.length || last) return { text: prefix + res.text, sources, skills: skillLabels };
+      if (!res.functionCalls.length || last) return { text: prefix + res.text, sources, skills: skillLabels, tier, model: chosen.model, modelLabel: chosen.label };
 
       if (res.text.trim()) prefix += res.text.trim() + '\n\n';
       convo.push({ role: 'model', parts: res.parts });
@@ -152,7 +200,7 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
       }
       convo.push({ role: 'user', parts: responses });
     }
-    return { text: prefix, sources, skills: skillLabels };
+    return { text: prefix, sources, skills: skillLabels, tier, model: chosen.model, modelLabel: chosen.label };
   };
 
   const provider = searchProvider();
@@ -203,11 +251,11 @@ function transcript(m) {
   for (const t of m.turns) {
     if (t.error || t.pending) continue;
     if (t.speaker === 'research') {
-      out.push(`[INVESTIGACIÓN WEB${t.focus ? ` sobre "${t.focus}"` : ''}]\n${t.digest}`);
+      out.push(`[INVESTIGACIÓN WEB${t.focus ? ` sobre "${t.focus}"` : ''}]\n${String(t.digest || '').slice(0, 2800)}`);
     } else if (t.speaker === 'kike') {
       out.push(`[${bossName()} – jefe]: ${t.text}`);
     } else {
-      out.push(`[${agentName(t.speaker)} – ${ROLES[t.speaker].title}]: ${t.text}`);
+      out.push(`[${agentName(t.speaker)} – ${ROLES[t.speaker].title}]: ${t.text.length > 1400 ? t.text.slice(0, 1400) + '…' : t.text}`);
     }
   }
   return out.join('\n\n');

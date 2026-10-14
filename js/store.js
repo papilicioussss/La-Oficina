@@ -42,6 +42,9 @@ export const DEFAULTS = {
     groqKnownModels: [],
     groqMeetings: true, // turnos de los agentes en la sala de juntas
     groqFallback: true, // respaldo cuando Gemini llega al límite
+    routerOn: true, // elegir el modelo según la tarea
+    heavyModel: '', // modelo para tareas pesadas ('' = el principal)
+    lightGroq: true, // usar Groq para mensajes simples
     skillsOff: [], // ids de skills desactivadas
     skillsPinned: [], // ids de skills que siempre se cargan
     customSkills: [], // skills creadas por Kike

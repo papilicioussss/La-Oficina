@@ -67,7 +67,7 @@ export async function tavilySearch({ key, proxy, query, timeRange, domains, maxR
   return (j.results || []).map((r) => ({
     title: r.title || r.url,
     url: r.url,
-    content: (r.content || '').replace(/\s+/g, ' ').slice(0, 900),
+    content: (r.content || '').replace(/\s+/g, ' ').slice(0, 600),
     date: r.published_date || '',
   }));
 }

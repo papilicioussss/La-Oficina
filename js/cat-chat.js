@@ -9,6 +9,7 @@ import { catHeadSvg } from './cat-sprite.js';
 import { bossName } from './prompts.js';
 import { facts, catLabel, gaps } from './memory.js';
 import { SetupError } from './brain.js';
+import { tierBadge } from './chat.js';
 
 const NAME_IDEAS = ['Mango', 'Arepa', 'Michi', 'Canelo', 'Miel', 'Limón', 'Papelón', 'Naranjo'];
 const MAX_IMAGES = 3;
@@ -93,7 +94,8 @@ function msgEl(m) {
       { class: 'msg-head' },
       catHeadSvg(),
       catName(),
-      m.via === 'groq' ? h('span', { class: 'via-badge', title: 'Gemini llegó al límite: respondió Groq' }, '⚡ Groq') : null
+      m.via === 'groq' ? h('span', { class: 'via-badge', title: m.tier === 'light' ? 'Mensaje simple: respondió Groq (rápido)' : 'Gemini llegó al límite: respondió Groq' }, '⚡ Groq') : null,
+      tierBadge(m)
     )
   );
   if (m.text) el.append(h('div', { class: 'md', html: md(m.text) }));
@@ -153,6 +155,9 @@ export async function sendToCat(text, images = []) {
     reply.text = res.text;
     reply.saved = res.saved;
     reply.via = res.via;
+    reply.tier = res.tier;
+    reply.model = res.model;
+    reply.modelLabel = res.modelLabel;
     if (!reply.text.trim()) {
       if (res.saved.length) reply.text = '¡Anotado! 🐾';
       else reply.error = 'No me salió respuesta. Intenta de nuevo.';

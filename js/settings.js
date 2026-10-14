@@ -123,6 +123,58 @@ function keysTab() {
       )
     );
   renderModels();
+
+  // Router: elegir el modelo según la tarea
+  const known = s.knownModels?.length ? s.knownModels : DEFAULT_MODELS;
+  const heavySel = h(
+    'select',
+    {
+      onChange: (e) => {
+        s.heavyModel = e.target.value;
+        saveSettings();
+      },
+    },
+    h('option', { value: '' }, 'Igual al principal'),
+    ...known.map((m) => h('option', { value: m.id }, m.id))
+  );
+  if (s.heavyModel && !known.some((m) => m.id === s.heavyModel)) heavySel.append(h('option', { value: s.heavyModel }, s.heavyModel));
+  heavySel.value = s.heavyModel || '';
+  const check = (key, label, hint) =>
+    h(
+      'div',
+      { class: 'field' },
+      h(
+        'label',
+        { class: 'check' },
+        h('input', {
+          type: 'checkbox',
+          checked: s[key] !== false,
+          onChange: (e) => {
+            s[key] = e.target.checked;
+            saveSettings();
+          },
+        }),
+        label
+      ),
+      hint ? h('span', { class: 'hint' }, hint) : null
+    );
+  const routerBox = h(
+    'div',
+    null,
+    h('div', { class: 'section-title' }, 'Modelo automático según la tarea'),
+    h(
+      'p',
+      { class: 'note' },
+      '🚦 Los agentes y el gato eligen solos el modelo para gastar lo justo: un saludo o un "gracias" usa el modelo rápido (con un prompt mínimo y sin buscar en la web); lo normal usa el modelo principal; las tareas grandes (planes, análisis, guiones completos, fotos o textos largos) usan el modelo potente que elijas aquí. Verás una etiqueta ⚡ rápido o 🧠 potente en la respuesta.'
+    ),
+    check('routerOn', 'Elegir el modelo automáticamente'),
+    field(
+      'Modelo para tareas pesadas',
+      heavySel,
+      'Si eliges un modelo "Pro" ten en cuenta que su límite gratis es mucho más corto. Déjalo en "Igual al principal" para no gastarlo.'
+    ),
+    check('lightGroq', 'Usar Groq para mensajes simples', 'Si tienes la key de Groq funcionando, los saludos los responde Groq (rapidísimo) y ahorras cuota de Gemini.')
+  );
   gTest.addEventListener('click', async () => {
     store.save('settings');
     if (!s.geminiKey) {
@@ -231,6 +283,7 @@ function keysTab() {
       h('span', null, 'Sácala gratis en ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener noreferrer' }, 'aistudio.google.com/apikey'), '. ', gStatus)
     ),
     modelsBox,
+    routerBox,
     h('div', { class: 'section-title' }, 'Búsqueda web'),
     h(
       'div',

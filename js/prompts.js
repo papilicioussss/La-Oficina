@@ -135,6 +135,16 @@ export function agentName(id) {
   return store.agents()[id]?.name || ROLES[id].title;
 }
 
+/** Prompt mínimo para saludos y charla corta (unos 150 tokens en vez de ~2.000). */
+export function buildLightPrompt(id) {
+  const a = store.agents()[id];
+  const role = ROLES[id];
+  const marca = store.brief().marca || 'la marca';
+  return `Eres ${a.name}, ${role.title.toLowerCase()} de "La Oficina", el equipo de contenido de ${marca}, y trabajas para ${bossName()}, tu jefe. Hoy es ${today()}.
+Personalidad: ${a.personality || 'cercana y práctica'}
+Te escribió un mensaje simple (saludo, gracias o charla corta). Responde en español venezolano, con calidez, en 1 a 3 frases, y ofrece en una línea cómo puedes ayudar desde tu área (${role.short}). No hagas tareas largas ni inventes datos: si te pide algo más, dile que con gusto lo haces.`;
+}
+
 export function buildSystemPrompt(id, { searchAvailable = false, meeting = false, skills } = {}) {
   const a = store.agents()[id];
   const role = ROLES[id];
@@ -186,7 +196,13 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
 
   if (id === 'analista') {
     const posts = [...store.get('metrics')].sort((x, y) => (x.fecha < y.fecha ? -1 : 1));
-    if (posts.length) parts.push(`## Registro de métricas de Kike (datos reales, cargados a mano)\n${digest(posts)}`);
+    if (posts.length) {
+      // La tabla completa solo va cuando la consulta es de métricas; si no, un resumen corto.
+      const needsDetail = (skills || []).some((s) => ['metricas', 'embudo-ventas', 'reporte', 'experimentos', 'algoritmos'].includes(s.id));
+      parts.push(
+        `## Registro de métricas de Kike (datos reales, cargados a mano)\n${digest(posts, { limit: needsDetail ? 25 : 0 })}${needsDetail ? '' : '\n(Si necesitas el detalle por publicación, pídele a Kike que te pida el análisis de métricas.)'}`
+      );
+    }
   }
 
   if ((a.extra || '').trim()) parts.push(`## Indicaciones extra de Kike\n${a.extra.trim()}`);
@@ -246,7 +262,7 @@ export const CAT_TOOLS = [
   },
 ];
 
-export function buildCatPrompt() {
+export function buildCatPrompt({ light = false } = {}) {
   const name = catName() === 'el gato' ? 'el gato' : catName();
   const boss = bossName();
   const marca = store.brief().marca || 'Vacilando Ando Tours';
@@ -254,6 +270,11 @@ export function buildCatPrompt() {
   const memory = memoryText({ withIds: true });
   const total = facts().length;
   const agents = store.agents();
+  if (light) {
+    const g = missing[0];
+    return `Eres ${name}, un gato amarillo travieso y cariñoso: la mascota de "La Oficina" y el asistente personal de ${boss} (${marca}, agencia de viajes de Venezuela). Eres la memoria de la marca: guardas lo que ${boss} te cuenta. Hoy es ${today()}.
+Te escribió un mensaje simple (saludo, gracias o charla corta). Responde como un compañero cercano y venezolano, en 1 a 3 frases, con un toque de gato (un *ronronea* o un "miau" de vez en cuando, no siempre). ${g ? `Si es natural, haz UNA pregunta para completar lo que falta: ${g.ask}.` : 'Pregúntale si hay novedades de la marca.'} No inventes datos ni escribas copys o guiones.`;
+  }
   return `Eres ${name}, un gato amarillo travieso y cariñoso: la mascota de "La Oficina" y el asistente personal de ${boss}, quien maneja las redes (Instagram y TikTok) de ${marca}, una agencia de viajes y excursiones de Venezuela. Vives en la oficina de ${boss}: duermes en tu camita o sobre su escritorio y a veces paseas por las otras salas. Hoy es ${today()}.
 
 ## Para qué existes

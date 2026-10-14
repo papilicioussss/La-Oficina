@@ -92,7 +92,7 @@ export function gaps() {
  * Texto de la memoria para los prompts. Con ids para que el gato pueda corregir/borrar.
  * Se corta por tamaño: se priorizan los datos más recientes.
  */
-export function memoryText({ withIds = false, max = 4200 } = {}) {
+export function memoryText({ withIds = false, max = 3500 } = {}) {
   const list = [...facts()].sort((a, b) => b.ts - a.ts);
   const picked = [];
   let size = 0;

@@ -3,17 +3,15 @@
 import * as store from './store.js';
 import { generate, ApiError } from './gemini.js';
 import { groqChat, groqJSON } from './groq.js';
-import { buildCatPrompt, CAT_TOOLS, bossName } from './prompts.js';
+import { buildCatPrompt, CAT_TOOLS, bossName, catName } from './prompts.js';
 import { addFact, removeFact, updateFact, restoreFact, facts, MEM_CATS } from './memory.js';
-import { groqReady, noteGroqFailure, SetupError } from './brain.js';
+import { groqReady, noteGroqFailure, lightGenerate, SetupError } from './brain.js';
+import { classify, modelFor, trimHistory } from './router.js';
 
 const geminiDown = (e) => e instanceof ApiError && (e.status === 429 || e.status >= 500 || e.status === 0);
 
-function toContents(history, text, images) {
-  const contents = history
-    .filter((m) => m.text && !m.pending && !m.error)
-    .slice(-20)
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+function toContents(history, text, images, tier = 'standard') {
+  const contents = trimHistory(history, tier).map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
   contents.push({
     role: 'user',
     parts: [{ text: text || 'Mira la imagen que te mando.' }, ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))],
@@ -51,15 +49,28 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
   }
   const saved = [];
 
+  // Router: un saludo no necesita herramientas ni la memoria completa.
+  const { tier } = classify({ text, images: images.length, names: [catName()] });
+  if (tier === 'light') {
+    try {
+      const res = await lightGenerate({ system: buildCatPrompt({ light: true }), history: trimHistory(history, 'light'), text, signal, onText, onStatus });
+      return { text: res.text, saved, via: res.via === 'groq' ? 'groq' : 'gemini', tier, model: res.model };
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      // si la vía rápida falla, sigue la vía normal (con respaldo incluido)
+    }
+  }
+  const chosen = modelFor(tier);
+
   const viaGemini = async () => {
     const system = buildCatPrompt();
-    const convo = toContents(history, text, images);
+    const convo = toContents(history, text, images, tier);
     let prefix = '';
     for (let step = 0; step < 4; step++) {
       onStatus?.('thinking');
       const res = await generate({
         apiKey: s.geminiKey,
-        model: s.model,
+        model: chosen.model,
         system,
         contents: convo,
         tools: [{ functionDeclarations: CAT_TOOLS }],
@@ -68,7 +79,7 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
         signal,
         onText: (t) => onText?.(prefix + t),
       });
-      if (!res.functionCalls.length || step === 3) return { text: prefix + res.text, saved, via: 'gemini' };
+      if (!res.functionCalls.length || step === 3) return { text: prefix + res.text, saved, via: 'gemini', tier, model: chosen.model, modelLabel: chosen.label };
       if (res.text.trim()) prefix += res.text.trim() + '\n\n';
       convo.push({ role: 'model', parts: res.parts });
       const responses = [];
@@ -89,7 +100,7 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
       apiKey: s.groqKey,
       model: s.groqModel,
       system: buildCatPrompt() + '\n\n(En este momento no tienes herramientas: conversa normal; los datos que te den se guardan solos.)',
-      messages: toContents(history, text, []).map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
+      messages: toContents(history, text, [], tier).map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
       signal,
       onText,
     });

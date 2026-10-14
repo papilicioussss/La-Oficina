@@ -88,6 +88,7 @@ export function digest(posts, { limit = 25 } = {}) {
         '.'
     );
   }
+  if (!limit) return lines.join('\n');
   lines.push('', `Detalle (más recientes primero, máx. ${limit}) — tasas calculadas sobre alcance o vistas:`);
   lines.push('fecha,red,formato,tema,vistas,alcance,likes,coment,compart,guard,seguid,visitas_perfil,tiempo_prom_s,retencion_%,consultas,interaccion,notas');
   for (const p of sorted.slice(0, limit)) {

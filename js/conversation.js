@@ -70,6 +70,9 @@ export async function sendToAgent(agentId, text, images = [], opts = {}) {
     reply.sources = res.sources;
     if (res.via) reply.via = res.via;
     reply.skills = res.skills || [];
+    reply.tier = res.tier;
+    reply.model = res.model;
+    reply.modelLabel = res.modelLabel;
     if (!reply.text.trim()) reply.error = 'No llegó respuesta. Intenta de nuevo.';
   } catch (e) {
     if (e.name === 'AbortError') {
