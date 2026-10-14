@@ -2215,3 +2215,18 @@ textarea {
   color: var(--warn, #b45309);
   font-weight: var(--w-medium);
 }
+
+.quick {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.quick .chip {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.composer-row {
+  flex-wrap: wrap;
+}

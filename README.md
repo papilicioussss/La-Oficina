@@ -65,8 +65,7 @@ La app **no hace** documentos, edición de video, flyers ni identidad visual: so
 Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psicología del consumidor, ofertas, WhatsApp y cierre, community, stories, tendencias, algoritmos, métricas, medición de ventas, competencia, público, pruebas A/B, estacionalidad, informes, estructura de guiones, formatos de turismo, storytelling, calendario editorial, series, análisis de guiones, creadores e influencers, lanzamientos, reutilización de contenido, SEO social y más.
 
 - **Se activan solas** según lo que pidas (máximo 3 a la vez, más las básicas), así gastas pocos tokens. En cada respuesta ves cuáles usó (🛠).
-- **"✨ Elegir skills por mí"**: escribes lo que necesitas, tocas ✨ y te propone las skills que encajan (versión simple, por palabras clave, gratis). Si quieres, "🤖 Afinar con IA" las elige con un modelo rápido (gasta 1 consulta gratis). Revisas, marcas/desmarcas y das "Usar estas".
-- **Puedes elegirlas a mano** con el botón "🛠 Manual" del chat.
+- **Botón "✨ Skills"** del chat: si escribiste lo que necesitas, te marca las que encajan (por palabras clave, gratis); si quieres, "🤖 Afinar con IA" las elige con un modelo rápido (gasta 1 consulta gratis). Siempre puedes marcar otras a mano y dar "Usar estas".
 - En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
 
 ## Vida ambiental de la oficina
@@ -75,7 +74,7 @@ Cuando un agente está libre se mueve como en una oficina real: teclea un rato, 
 
 ## Informe semanal y contador de consultas
 
-- **📊 Analizar mi semana** (en la oficina de Alex): compara tus publicaciones de los últimos 7 días contra los 7 anteriores. Los números (vistas, interacción, guardados, compartidos, seguidores, consultas) los calcula la app con tus métricas reales y Alex los interpreta: qué funcionó, qué no, 3 acciones para la próxima semana y qué datos te faltan. Si no hay publicaciones cargadas, te lleva a la pestaña de métricas.
+- **📊 Mi semana** (en la oficina de Alex): compara tus publicaciones de los últimos 7 días contra los 7 anteriores. Los números (vistas, interacción, guardados, compartidos, seguidores, consultas) los calcula la app con tus métricas reales y Alex los interpreta: qué funcionó, qué no, 3 acciones para la próxima semana y qué datos te faltan. Si no hay publicaciones cargadas, te lleva a la pestaña de métricas.
 - **📈 Consultas de hoy**: en el inicio verás una línea discreta ("Hoy: Gemini 23 · Groq 8 · Búsquedas 5") y, si algún proveedor te dijo "límite", un aviso. En Configuración → Claves puedes anotar el tope diario que te muestra cada panel para que te avise al llegar al 80 %. Es una guía (solo cuenta lo que envía esta app); la cuenta oficial la llevan Google, Groq y Tavily.
 
 ## Favoritos y fechas para vender

@@ -9,7 +9,6 @@ import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
 import { sendToAgent, stopAgent, retry, clearChat, isBusy } from './conversation.js';
-import { searchProvider } from './brain.js';
 import { md, toPlain } from './markdown.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
@@ -178,31 +177,27 @@ function chatView(agentId) {
     if (stick) toBottom();
   };
 
-  // ---- Atajos ----
-  const quick = h(
-    'div',
-    { class: 'quick', role: 'list', 'aria-label': 'Ideas rápidas' },
-    ROLES[agentId].quick.map((q) =>
-      h(
-        'button',
-        {
-          class: 'chip',
-          type: 'button',
-          role: 'listitem',
-          title: q,
-          onClick: () => {
-            textarea.value = q;
-            runtime.drafts[agentId] = q;
-            autoGrow();
-            textarea.focus();
-            const m = q.match(/\[[^\]]+\]/);
-            if (m) textarea.setSelectionRange(m.index, m.index + m[0].length);
-          },
-        },
-        q
-      )
-    )
-  );
+  // ---- Atajos: dos a la vista y el resto detrás de "💡 Más ideas" (sin barra para deslizar) ----
+  const useQuick = (q) => {
+    textarea.value = q;
+    runtime.drafts[agentId] = q;
+    autoGrow();
+    textarea.focus();
+    const m = q.match(/\[[^\]]+\]/);
+    if (m) textarea.setSelectionRange(m.index, m.index + m[0].length);
+  };
+  const quickAll = ROLES[agentId].quick;
+  const quick = h('div', { class: 'quick', role: 'list', 'aria-label': 'Ideas rápidas' });
+  let quickOpen = false;
+  const renderQuick = () => {
+    const shown = quickOpen ? quickAll : quickAll.slice(0, 2);
+    quick.replaceChildren(
+      ...shown.map((q) => h('button', { class: 'chip', type: 'button', role: 'listitem', title: q, onClick: () => useQuick(q) }, q)),
+      quickAll.length > 2
+        ? h('button', { class: 'chip', type: 'button', 'aria-expanded': String(quickOpen), onClick: () => { quickOpen = !quickOpen; renderQuick(); } }, quickOpen ? '✕ Menos ideas' : '💡 Más ideas')
+        : null
+    );
+  };
 
   // ---- Composer ----
   const textarea = h('textarea', {
@@ -266,168 +261,89 @@ function chatView(agentId) {
     renderAttachments();
   });
 
-  const webChip = h('button', { class: 'chip', type: 'button' });
-  const renderWebChip = () => {
-    const s = store.settings();
-    const provider = searchProvider();
-    webChip.setAttribute('aria-pressed', String(!!s.webSearch));
-    webChip.textContent = s.webSearch ? `🔎 Web: sí` : '🔎 Web: no';
-    webChip.title = s.webSearch
-      ? `Puede buscar en internet (${provider === 'tavily' ? 'Tavily' : 'Google vía Gemini'}). Toca para desactivar y ahorrar créditos.`
-      : 'Búsqueda web desactivada. Toca para activarla.';
-  };
-  webChip.addEventListener('click', () => {
-    const s = store.settings();
-    s.webSearch = !s.webSearch;
-    store.save('settings');
-    renderWebChip();
-  });
 
-  // Habilidades: se eligen solas según lo que pides; aquí puedes forzar alguna para el próximo mensaje.
+  // Habilidades: un solo botón. Si hay texto escrito, propone las que encajan (palabras clave, gratis; se puede afinar con IA);
+  // siempre permite marcar a mano. Si no marcas nada, se activan solas según lo que pidas.
   const skillsChip = h('button', { class: 'chip', type: 'button' });
   const renderSkillsChip = () => {
     const n = (runtime.forcedSkills[agentId] || []).length;
-    skillsChip.textContent = n ? `🛠 Skills (${n})` : '🛠 Manual';
+    skillsChip.textContent = n ? `✨ Skills (${n})` : '✨ Skills';
     skillsChip.setAttribute('aria-pressed', String(!!n));
-    skillsChip.title = 'Elige habilidades de marketing para tu próximo mensaje (si no eliges, se activan solas según lo que pidas)';
+    skillsChip.title = 'Te propongo las skills según lo que escribiste, o las eliges tú. Si no eliges, se activan solas.';
   };
   skillsChip.addEventListener('click', () => {
-    const chosen = new Set(runtime.forcedSkills[agentId] || []);
-    const list = skillsFor(agentId).filter((x) => !x.core && isEnabled(x.id));
-    const body = h(
-      'div',
-      null,
-      h('p', { class: 'hint mt-0' }, 'Se activan solas según lo que escribas. Marca las que quieras que use sí o sí en tu próximo mensaje (máximo 4).'),
-      h(
-        'div',
-        { class: 'radio-cards' },
-        list.map((x) =>
-          h(
-            'label',
-            { class: 'radio-card' },
-            h('input', {
-              type: 'checkbox',
-              checked: chosen.has(x.id),
-              onChange: (e) => {
-                if (e.target.checked) {
-                  if (chosen.size >= 4) {
-                    e.target.checked = false;
-                    toast('Máximo 4 skills a la vez.', 'warn', 2000);
-                    return;
-                  }
-                  chosen.add(x.id);
-                } else chosen.delete(x.id);
-              },
-            }),
-            h('span', null, h('strong', null, `${x.icon} ${x.name}`), h('small', null, x.desc))
-          )
-        )
-      )
-    );
-    openModal({
-      title: `🛠 Skills de ${store.agents()[agentId].name}`,
-      body,
-      actions: [
-        {
-          label: 'Quitar selección',
-          kind: 'ghost',
-          onClick: (close) => {
-            runtime.forcedSkills[agentId] = [];
-            renderSkillsChip();
-            close();
-          },
-        },
-        {
-          label: 'Listo',
-          kind: 'primary',
-          onClick: (close) => {
-            runtime.forcedSkills[agentId] = [...chosen];
-            renderSkillsChip();
-            close();
-          },
-        },
-      ],
-    });
-  });
-
-  // "Elegir skills por mí": propone las skills según lo que escribiste (simple, gratis) y se puede afinar con IA.
-  const autoChip = h('button', { class: 'chip', type: 'button', title: 'Escribe lo que necesitas y toca aquí: te propongo las skills que mejor encajan' }, '✨ Elegir skills por mí');
-  autoChip.addEventListener('click', () => {
     const text = textarea.value.trim();
-    if (!text) {
-      toast('Escribe primero lo que necesitas y luego toca ✨ para que elija las skills.', 'info', 3500);
-      textarea.focus();
-      return;
-    }
-    const simple = explainPick(agentId, text);
-    const chosen = new Set(simple.map((x) => x.skill.id));
-    const body = h('div');
-    let nota = simple.length ? 'Estas encajan con lo que escribiste (por las palabras que usaste):' : 'No encontré skills claras por palabras clave. Puedes afinar con IA o elegirlas a mano.';
+    const simple = text ? explainPick(agentId, text) : [];
+    const chosen = new Set(runtime.forcedSkills[agentId] || []);
+    simple.forEach((x) => chosen.add(x.skill.id));
     const reasons = new Map(simple.map((x) => [x.skill.id, x.matched.slice(0, 3).join(', ')]));
+    const suggested = new Set(simple.map((x) => x.skill.id));
+    const body = h('div');
+    let nota = !text
+      ? 'Se activan solas según lo que escribas. Marca las que quieras que use sí o sí en tu próximo mensaje (máximo 4). Si escribes primero lo que necesitas, te las sugiero.'
+      : simple.length
+        ? 'Marqué las que encajan con lo que escribiste. Cambia lo que quieras (máximo 4).'
+        : 'No encontré skills claras por palabras clave. Puedes afinar con IA o marcarlas tú.';
+    const card = (x) =>
+      h(
+        'label',
+        { class: 'radio-card' },
+        h('input', {
+          type: 'checkbox',
+          checked: chosen.has(x.id),
+          onChange: (e) => {
+            if (e.target.checked) {
+              if (chosen.size >= 4) {
+                e.target.checked = false;
+                toast('Máximo 4 skills a la vez.', 'warn', 2000);
+                return;
+              }
+              chosen.add(x.id);
+            } else chosen.delete(x.id);
+          },
+        }),
+        h('span', null, h('strong', null, `${x.icon} ${x.name}`), h('small', null, reasons.get(x.id) ? `${x.desc} · por: ${reasons.get(x.id)}` : x.desc))
+      );
     const render = () => {
       const all = skillsFor(agentId).filter((x) => !x.core && isEnabled(x.id));
-      const shown = all.filter((x) => reasons.has(x.id) || chosen.has(x.id));
+      const top = all.filter((x) => suggested.has(x.id));
+      const rest = all.filter((x) => !suggested.has(x.id));
       body.replaceChildren(
         h('p', { class: 'hint mt-0' }, nota),
-        shown.length
-          ? h(
-              'div',
-              { class: 'radio-cards' },
-              shown.map((x) =>
-                h(
-                  'label',
-                  { class: 'radio-card' },
-                  h('input', {
-                    type: 'checkbox',
-                    checked: chosen.has(x.id),
-                    onChange: (e) => {
-                      if (e.target.checked) {
-                        if (chosen.size >= 4) {
-                          e.target.checked = false;
-                          toast('Máximo 4 skills a la vez.', 'warn', 2000);
-                          return;
-                        }
-                        chosen.add(x.id);
-                      } else chosen.delete(x.id);
-                    },
-                  }),
-                  h('span', null, h('strong', null, `${x.icon} ${x.name}`), h('small', null, reasons.get(x.id) ? `${x.desc} · por: ${reasons.get(x.id)}` : x.desc))
-                )
-              )
-            )
-          : null
+        top.length ? h('div', { class: 'radio-cards' }, top.map(card)) : null,
+        top.length && rest.length ? h('p', { class: 'hint' }, 'Otras skills:') : null,
+        h('div', { class: 'radio-cards' }, rest.map(card))
       );
     };
     render();
     openModal({
-      title: '✨ Skills sugeridas',
+      title: '✨ Skills para tu mensaje',
       body,
       actions: [
-        {
-          label: '🤖 Afinar con IA',
-          kind: 'ghost',
-          onClick: async (close, btn) => {
-            btn.disabled = true;
-            btn.textContent = 'Pensando…';
-            try {
-              const r = await suggestSkillsAI(agentId, text);
-              chosen.clear();
-              reasons.clear();
-              r.ids.forEach((id) => {
-                chosen.add(id);
-                reasons.set(id, '');
-              });
-              nota = `La IA eligió estas: ${r.motivo}`;
-              render();
-            } catch (e) {
-              toast(e.message || 'No pude consultar a la IA.', 'error');
-            } finally {
-              btn.disabled = false;
-              btn.textContent = '🤖 Afinar con IA';
+        text
+          ? {
+              label: '🤖 Afinar con IA',
+              kind: 'ghost',
+              onClick: async (close, btn) => {
+                btn.disabled = true;
+                btn.textContent = 'Pensando…';
+                try {
+                  const r = await suggestSkillsAI(agentId, text);
+                  chosen.clear();
+                  suggested.clear();
+                  reasons.clear();
+                  r.ids.forEach((id) => (chosen.add(id), suggested.add(id)));
+                  nota = `La IA eligió estas: ${r.motivo}`;
+                  render();
+                } catch (e) {
+                  toast(e.message || 'No pude consultar a la IA.', 'error');
+                } finally {
+                  btn.disabled = false;
+                  btn.textContent = '🤖 Afinar con IA';
+                }
+              },
             }
-            return false;
-          },
-        },
+          : null,
         {
           label: 'Usar estas',
           kind: 'primary',
@@ -435,10 +351,10 @@ function chatView(agentId) {
             runtime.forcedSkills[agentId] = [...chosen].filter((id) => skillById(id));
             renderSkillsChip();
             close();
-            toast(chosen.size ? 'Listo: las usaré en tu próximo mensaje.' : 'Sin skills extra: se activarán solas según lo que pidas.', 'info', 2500);
+            if (chosen.size) toast('Listo: las usaré en tu próximo mensaje.', 'info', 2500);
           },
         },
-      ],
+      ].filter(Boolean),
     });
   });
 
@@ -471,7 +387,7 @@ function chatView(agentId) {
               );
             },
           },
-          '📊 Analizar mi semana'
+          '📊 Mi semana'
         )
       : null;
 
@@ -521,14 +437,12 @@ function chatView(agentId) {
       { class: 'composer-row' },
       h(
         'button',
-        { class: 'chip', type: 'button', title: 'Adjuntar captura o foto (Gemini puede leerla)', onClick: () => fileInput.click() },
-        '📎 Imagen'
+        { class: 'chip', type: 'button', 'aria-label': 'Adjuntar imagen', title: 'Adjuntar captura o foto (Gemini puede leerla)', onClick: () => fileInput.click() },
+        '📎'
       ),
       fileInput,
-      weekChip,
-      autoChip,
       skillsChip,
-      webChip,
+      weekChip,
       h('span', { class: 'spacer' }),
       sendBtn
     )
@@ -537,7 +451,7 @@ function chatView(agentId) {
   wrap.append(list, quick, form);
   renderAll();
   renderAttachments();
-  renderWebChip();
+  renderQuick();
   renderSkillsChip();
   renderSend();
   requestAnimationFrame(autoGrow);

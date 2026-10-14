@@ -146,7 +146,7 @@ Personalidad: ${a.personality || 'cercana y práctica'}
 Te escribió un mensaje simple (saludo, gracias o charla corta). Responde en español venezolano, con calidez, en 1 a 3 frases, y ofrece en una línea cómo puedes ayudar desde tu área (${role.short}). No hagas tareas largas ni inventes datos: si te pide algo más, dile que con gusto lo haces.`;
 }
 
-export function buildSystemPrompt(id, { searchAvailable = false, meeting = false, skills } = {}) {
+export function buildSystemPrompt(id, { searchAvailable = false, meeting = false, skills, mustSearch = false } = {}) {
   const a = store.agents()[id];
   const role = ROLES[id];
   const marca = store.brief().marca || 'la marca';
@@ -179,6 +179,7 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
     parts.push(
       '## Búsqueda web\nPuedes buscar en internet. Úsalo para tendencias, novedades del algoritmo, estrategias recientes de expertos o datos de destinos. No busques para tareas que no lo necesitan (por ejemplo, reescribir un copy). Cita los enlaces que uses.'
     );
+    if (mustSearch) parts.push(`## Búsqueda pedida\n${bossName()} te pidió expresamente buscar en internet: usa buscar_web antes de responder y cita las fuentes.`);
   } else if (!meeting) {
     parts.push(
       '## Búsqueda web\nAhora mismo NO tienes búsqueda web. Si la respuesta depende de datos recientes, dilo claramente y responde con lo que sabes, marcando qué hay que verificar.'

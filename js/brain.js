@@ -122,6 +122,11 @@ export async function lightGenerate({ system, history, text, signal, onText, onS
  * history: mensajes previos [{role:'user'|'model', text}]
  * Devuelve { text, sources }.
  */
+/** ¿Kike pidió expresamente buscar en internet? Entonces el agente busca sí o sí (y se ve "Buscando en la web…"). */
+export function wantsSearch(text = '') {
+  return /\b(busca|buscame|búscame|buscar|investiga|investigame|averigua|googlea)\b|en (internet|la web|google)|en linea|en línea/i.test(text);
+}
+
 export async function runAgent({ agentId, history, text, images = [], forcedSkills = [], onText, onStatus, signal }) {
   const s = requireKey();
   const recentUser = history.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
@@ -149,7 +154,7 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
   });
 
   const attempt = async (provider) => {
-    const system = buildSystemPrompt(agentId, { searchAvailable: !!provider, skills });
+    const system = buildSystemPrompt(agentId, { searchAvailable: !!provider, skills, mustSearch: !!provider && wantsSearch(text) });
     const tools = toolsFor(provider);
     const convo = [...contents];
     const sources = [];
