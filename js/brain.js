@@ -38,7 +38,7 @@ function geminiDown(e) {
   return e instanceof ApiError && (e.status === 429 || e.status >= 500 || e.status === 0);
 }
 
-function noteGroqFailure(e) {
+export function noteGroqFailure(e) {
   if (e instanceof GroqError && e.status === 0) runtime.groqBlocked = true;
   if (!runtime.groqWarned) {
     runtime.groqWarned = true;

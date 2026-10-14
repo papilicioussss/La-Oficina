@@ -21,12 +21,19 @@ function friendlyError(status, body) {
 }
 
 async function request(path, apiKey, init) {
+  // Una key con espacios, comillas o "…" hace que el navegador rechace la petición antes de enviarla.
+  if (!/^[\x21-\x7e]+$/.test(apiKey || '')) {
+    throw new GroqError('Tu API key de Groq tiene caracteres raros (espacios, comillas o puntos suspensivos). Cópiala de nuevo desde console.groq.com/keys, sin nada más.', 401);
+  }
   let res;
   try {
     res = await fetch(BASE + path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` } });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new GroqError('No pude conectar con Groq desde el navegador (sin internet o bloqueo del navegador).', 0);
+    throw new GroqError(
+      `No pude conectar con Groq. Suele ser un bloqueador de anuncios o extensión de privacidad, una VPN o red que bloquea Groq, o que Groq no está disponible en tu red o región. Prueba abrir api.groq.com en otra pestaña o desactivar extensiones para esta página. (Detalle: ${e.message || 'error de red'})`,
+      0
+    );
   }
   if (!res.ok) {
     let j = null;

@@ -101,7 +101,13 @@ function msgEl(m) {
   if (m.error) {
     el.append(
       h('p', null, '⚠️ ', m.error),
-      h('div', { class: 'msg-actions' }, m.setup ? h('button', { class: 'chip', type: 'button', onClick: () => go('#/config/claves') }, '⚙️ Ir a Configuración') : null)
+      h(
+        'div',
+        { class: 'msg-actions' },
+        m.setup
+          ? h('button', { class: 'chip', type: 'button', onClick: () => go('#/config/claves') }, '⚙️ Ir a Configuración')
+          : h('button', { class: 'chip', type: 'button', onClick: () => retryCat(m.id) }, '🔄 Reintentar')
+      )
     );
   }
   if (!m.pending) {
@@ -165,6 +171,18 @@ export async function sendToCat(text, images = []) {
     store.save('chat:gato');
     emit('cat-chat', { type: 'done', id: reply.id });
   }
+}
+
+/** Reintenta el mensaje que falló. */
+export function retryCat(replyId) {
+  const list = chat();
+  const i = list.findIndex((m) => m.id === replyId);
+  if (i < 1 || list[i - 1].role !== 'user') return;
+  const userMsg = list[i - 1];
+  if (userMsg.images) toast('Las fotos no se guardan: si hacían falta, adjúntalas de nuevo.', 'info');
+  list.splice(i - 1, 2);
+  store.save('chat:gato');
+  sendToCat(userMsg.text);
 }
 
 // ---------- Vistas ----------

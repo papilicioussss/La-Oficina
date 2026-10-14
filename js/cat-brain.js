@@ -5,7 +5,7 @@ import { generate, ApiError } from './gemini.js';
 import { groqChat, groqJSON } from './groq.js';
 import { buildCatPrompt, CAT_TOOLS, bossName } from './prompts.js';
 import { addFact, removeFact, updateFact, restoreFact, facts, MEM_CATS } from './memory.js';
-import { groqReady, SetupError } from './brain.js';
+import { groqReady, noteGroqFailure, SetupError } from './brain.js';
 
 const geminiDown = (e) => e instanceof ApiError && (e.status === 429 || e.status >= 500 || e.status === 0);
 
@@ -119,7 +119,14 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
   } catch (e) {
     if (e.name === 'AbortError' || !geminiDown(e) || !s.groqFallback || !groqReady() || images.length) throw e;
     onText?.('');
-    return viaGroq();
+    try {
+      return await viaGroq();
+    } catch (g) {
+      if (g.name === 'AbortError') throw g;
+      // Si el respaldo también falla, se muestra el motivo real (el de Gemini) y se avisa aparte de Groq.
+      noteGroqFailure(g);
+      throw e;
+    }
   }
 }
 
