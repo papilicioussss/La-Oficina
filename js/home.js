@@ -6,6 +6,7 @@ import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
+import { usageLine } from './usage.js';
 import { eventsBetween, todayISO, rangeLabel, whenLabel, KIND_META } from './calendar-ve.js';
 
 function checklist() {
@@ -90,6 +91,19 @@ function upcomingBlock() {
   );
 }
 
+function usageBlock() {
+  const u = usageLine();
+  if (!u.any && !u.hits.length) return null;
+  return h(
+    'p',
+    { class: 'usage-line', title: 'Consultas que esta app envió hoy desde este navegador. La cuenta oficial la llevan Google, Groq y Tavily.' },
+    `📈 Hoy: ${u.text || 'sin consultas'}`,
+    u.hits.length ? h('span', { class: 'usage-warn' }, ` · ⚠️ Te dijeron "límite": ${u.hits.join(', ')}`) : null,
+    ' ',
+    h('button', { class: 'link-btn', type: 'button', onClick: () => go('#/config/claves') }, 'Ver detalle')
+  );
+}
+
 export function renderHome(panel) {
   const meetings = store.get('meetings').slice(0, 3);
   const cards = h('div', { class: 'agent-cards' });
@@ -143,6 +157,7 @@ export function renderHome(panel) {
             )
           )
         : null,
+      usageBlock(),
       h(
         'p',
         { class: 'hint mt-5' },
@@ -150,5 +165,6 @@ export function renderHome(panel) {
       )
     )
   );
-  return on('status', renderCards);
+  const off = [on('status', renderCards)];
+  return () => off.forEach((f) => f());
 }

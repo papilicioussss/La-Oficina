@@ -73,6 +73,11 @@ Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psi
 
 Cuando un agente está libre se mueve como en una oficina real: teclea un rato, toma café, contesta una llamada, se estira, mira alrededor o pasea por su oficina (al librero, la planta, el servidor, la cámara…). **Es solo decoración**: ocurre únicamente cuando el agente no está haciendo nada. Apenas piensa, busca, habla o entra a una reunión, el gesto se corta al instante y ves su estado real ("Pensando…", "Buscando…"). Si abres su oficina mientras pasea, vuelve rápido a su silla. Se apaga en **Configuración → Equipo → Vida ambiental**, y se desactiva sola si tu dispositivo pide "reducir movimiento".
 
+## Informe semanal y contador de consultas
+
+- **📊 Analizar mi semana** (en la oficina de Alex): compara tus publicaciones de los últimos 7 días contra los 7 anteriores. Los números (vistas, interacción, guardados, compartidos, seguidores, consultas) los calcula la app con tus métricas reales y Alex los interpreta: qué funcionó, qué no, 3 acciones para la próxima semana y qué datos te faltan. Si no hay publicaciones cargadas, te lleva a la pestaña de métricas.
+- **📈 Consultas de hoy**: en el inicio verás una línea discreta ("Hoy: Gemini 23 · Groq 8 · Búsquedas 5") y, si algún proveedor te dijo "límite", un aviso. En Configuración → Claves puedes anotar el tope diario que te muestra cada panel para que te avise al llegar al 80 %. Es una guía (solo cuenta lo que envía esta app); la cuenta oficial la llevan Google, Groq y Tavily.
+
 ## Favoritos y fechas para vender
 
 - **⭐ Favoritos** (barra de arriba): debajo de cada respuesta de un agente tienes "⭐ Guardar". Le pones título, tipo (copy, hook, guion, análisis) y etiquetas, y luego buscas y filtras en la biblioteca. Desde ahí lo copias, se lo pasas a Nico, Alex o Sam, lo editas o lo borras. Va incluido en el respaldo de Configuración → Datos.
@@ -148,6 +153,7 @@ js/memory.js          memoria de la marca
 js/skills-data.js     biblioteca de skills de marketing
 js/skills.js          selección de skills según la consulta
 js/skills-ai.js       "Elegir skills por mí" con IA (opcional)
+js/usage.js           contador de consultas del día
 js/ambient.js         vida ambiental (gestos y paseos cuando están libres)
 js/favs.js            biblioteca de favoritos
 js/calendar-ve.js     feriados, puentes y fechas comerciales de Venezuela

@@ -1,5 +1,7 @@
 // Búsqueda web con Tavily (directo o a través de un proxy opcional).
 
+import { countCall, countLimitHit } from './usage.js';
+
 export class SearchUnavailable extends Error {
   constructor(message) {
     super(message);
@@ -48,6 +50,8 @@ export async function tavilySearch({ key, proxy, query, timeRange, domains, maxR
         : 'No pude conectar con Tavily desde el navegador (puede ser bloqueo CORS o falta de internet).'
     );
   }
+  countCall('tavily');
+  if (res.status === 429 || res.status === 432 || res.status === 433) countLimitHit('tavily');
   if (!res.ok) {
     let detail = '';
     try {

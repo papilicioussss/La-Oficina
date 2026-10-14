@@ -4,6 +4,7 @@ import { h, toast, copyText, fileToImagePart, isTouch, confirmDialog, domainOf, 
 import { skillsFor, isEnabled, explainPick, skillById } from './skills.js';
 import { suggestSkillsAI } from './skills-ai.js';
 import { favModal } from './favs.js';
+import { calendarPrompt } from './calendar-ve.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
@@ -13,6 +14,7 @@ import { md, toPlain } from './markdown.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
 import { renderMetrics } from './metrics.js';
+import { weekCompare } from './metrics-calc.js';
 
 const MAX_IMAGES = 4;
 
@@ -440,6 +442,39 @@ function chatView(agentId) {
     });
   });
 
+  // Informe semanal (solo Analista): los números de esta semana vs la anterior los calcula la app; Alex los interpreta.
+  const weekChip =
+    agentId === 'analista'
+      ? h(
+          'button',
+          {
+            class: 'chip',
+            type: 'button',
+            title: 'Compara tus publicaciones de los últimos 7 días contra los 7 anteriores y te da el informe',
+            onClick: () => {
+              if (isBusy(agentId)) {
+                toast(`${store.agents()[agentId].name} todavía está respondiendo.`, 'warn');
+                return;
+              }
+              const cmp = weekCompare(store.get('metrics'));
+              if (!cmp) {
+                toast('No hay publicaciones de las últimas 2 semanas. Carga tus métricas en la pestaña 📊 y vuelve a tocar.', 'info', 5000);
+                go(`#/agente/${agentId}/metricas`);
+                return;
+              }
+              const dates = calendarPrompt(21, 4);
+              sendToAgent(
+                agentId,
+                `Analiza mi semana. Estos números ya están calculados con mis métricas reales (no los recalcules ni inventes los que falten):\n\n${cmp.text}\n\nDame el informe corto: resumen en 3 líneas, qué funcionó y qué no (y por qué, si los datos lo permiten), qué haría la próxima semana (máximo 3 acciones concretas) y qué datos me faltan cargar para analizar mejor.${dates ? `\n\nTen en cuenta las fechas que vienen:\n${dates.split('\n').slice(2).join('\n')}` : ''}`,
+                [],
+                { skills: ['reporte', 'metricas'].filter((id) => skillById(id)) }
+              );
+            },
+          },
+          '📊 Analizar mi semana'
+        )
+      : null;
+
   const sendBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'submit' });
   const renderSend = () => {
     const busy = isBusy(agentId);
@@ -490,6 +525,7 @@ function chatView(agentId) {
         '📎 Imagen'
       ),
       fileInput,
+      weekChip,
       autoChip,
       skillsChip,
       webChip,

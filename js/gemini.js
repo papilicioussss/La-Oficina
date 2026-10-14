@@ -1,5 +1,7 @@
 // Cliente mínimo para la API de Gemini (Google AI Studio), llamado directo desde el navegador.
 
+import { countCall, countLimitHit } from './usage.js';
+
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 export class ApiError extends Error {
@@ -43,6 +45,8 @@ async function post(url, apiKey, body, signal) {
       if (e.name === 'AbortError') throw e;
       throw new ApiError('No hay conexión con Gemini. Revisa tu internet.', 0);
     }
+    countCall('gemini', decodeURIComponent(/\/models\/([^:/]+)/.exec(url)?.[1] || ''));
+    if (res.status === 429) countLimitHit('gemini');
     if ((res.status === 503 || res.status === 500) && attempt === 0) {
       await new Promise((r) => setTimeout(r, 1500));
       continue;

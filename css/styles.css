@@ -2205,3 +2205,13 @@ textarea {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-3);
 }
+
+.usage-line {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.usage-warn {
+  color: var(--warn, #b45309);
+  font-weight: var(--w-medium);
+}

@@ -14,6 +14,7 @@ import { MEM_CATS, facts, addFact, updateFact, removeFact, clearMemory } from '.
 import { allSkills, isEnabled, isPinned, norm } from './skills.js';
 import { SKILL_GROUPS } from './skills-data.js';
 import { uid } from './ui.js';
+import { usage, totalOf } from './usage.js';
 
 const TABS = [
   ['claves', '🔑 Claves'],
@@ -92,6 +93,46 @@ function modelSelect(current, onChange) {
 }
 
 // ---------------- Claves ----------------
+function usageCard(s) {
+  const u = usage();
+  const rows = [
+    ['gemini', 'Gemini', 'limitGemini', 'https://aistudio.google.com/rate-limit'],
+    ['groq', 'Groq', 'limitGroq', 'https://console.groq.com/settings/limits'],
+    ['tavily', 'Búsquedas web (Tavily)', 'limitTavily', 'https://app.tavily.com'],
+  ];
+  const models = Object.entries(u.gemini).sort((a, b) => b[1] - a[1]);
+  return h(
+    'section',
+    { class: 'team-card mt-5' },
+    h('strong', null, '📈 Consultas de hoy'),
+    h(
+      'p',
+      { class: 'hint' },
+      'Cuenta lo que esta app envió hoy desde este navegador (cada mensaje, búsqueda o turno de reunión puede gastar varias). Es una guía: la cuenta oficial la llevan Google, Groq y Tavily, y sus límites gratis cambian. Si anotas el tope que te muestra cada panel, te aviso cuando vayas por el 80 %.'
+    ),
+    ...rows.map(([key, label, limitKey, url]) =>
+      h(
+        'div',
+        { class: 'field' },
+        h('label', null, `${label}: ${totalOf(key, u)} hoy${u.hits[key] ? ` · ⚠️ dijeron "límite" ${u.hits[key]} ${u.hits[key] === 1 ? 'vez' : 'veces'}` : ''}`),
+        h('input', {
+          type: 'number',
+          min: 0,
+          placeholder: 'Tope diario que me marca el panel (0 = sin aviso)',
+          value: s[limitKey] || '',
+          'aria-label': `Tope diario de ${label}`,
+          onInput: (e) => {
+            s[limitKey] = Math.max(0, Number(e.target.value) || 0);
+            saveSettings();
+          },
+        }),
+        h('span', { class: 'hint' }, 'Mira tu tope real en ', h('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, url.replace('https://', '')), '.')
+      )
+    ),
+    models.length > 1 ? h('p', { class: 'hint' }, 'Gemini por modelo: ' + models.map(([m, n]) => `${m} ${n}`).join(' · ')) : null
+  );
+}
+
 function keysTab() {
   const s = store.settings();
   const wrap = h('div');
@@ -323,7 +364,8 @@ function keysTab() {
         )
       )
     ),
-    groqSection(s)
+    groqSection(s),
+    usageCard(s)
   );
   return wrap;
 }

@@ -117,3 +117,42 @@ export function digest(posts, { limit = 25 } = {}) {
   }
   return lines.join('\n');
 }
+
+const isoDay = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+/**
+ * Comparación de la última semana (7 días contando hoy) contra la anterior, calculada aquí para que los números sean exactos.
+ * Devuelve { thisWeek, prevWeek, text } o null si no hay publicaciones en las dos semanas.
+ */
+export function weekCompare(posts, now = new Date()) {
+  const day = (back) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, 12);
+    return isoDay(d);
+  };
+  const [aFrom, aTo, bFrom, bTo] = [day(6), day(0), day(13), day(7)];
+  const inRange = (p, from, to) => p.fecha >= from && p.fecha <= to;
+  const thisWeek = posts.filter((p) => inRange(p, aFrom, aTo));
+  const prevWeek = posts.filter((p) => inRange(p, bFrom, bTo));
+  if (!thisWeek.length && !prevWeek.length) return null;
+  const line = (label, list, from, to) => {
+    if (!list.length) return `${label} (${from} a ${to}): sin publicaciones registradas.`;
+    const s = summary(list);
+    const total = (k) => list.reduce((a, p) => a + (num(p[k]) || 0), 0);
+    return `${label} (${from} a ${to}): ${s.count} publicaciones · vistas promedio ${n(s.vistas)} · interacción ${pct(s.interaccion)} · guardados ${pct(s.guardados)} · compartidos ${pct(s.compartidos)} · seguidores ganados ${total('seguidores')} · consultas WhatsApp/DM ${s.consultasTotal ?? 's/d'}.`;
+  };
+  const delta = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b > 0 ? `${a >= b ? '+' : ''}${(((a - b) / b) * 100).toFixed(0)}%` : 's/d');
+  const sa = summary(thisWeek);
+  const sb = summary(prevWeek);
+  const best = [...thisWeek].filter((p) => rates(p).interaccion != null).sort((x, y) => rates(y).interaccion - rates(x).interaccion);
+  const fmt = (p) => `${p.fecha} ${p.red}/${p.formato} "${p.tema || 'sin tema'}" (interacción ${pct(rates(p).interaccion)}, vistas ${p.vistas ?? 's/d'})`;
+  const text = [
+    line('Esta semana', thisWeek, aFrom, aTo),
+    line('Semana anterior', prevWeek, bFrom, bTo),
+    `Cambio vs. semana anterior → vistas ${delta(sa.vistas, sb.vistas)} · interacción ${delta(sa.interaccion, sb.interaccion)} · guardados ${delta(sa.guardados, sb.guardados)} · compartidos ${delta(sa.compartidos, sb.compartidos)}.`,
+    best.length ? `Mejor de la semana: ${fmt(best[0])}.` : '',
+    best.length > 1 ? `Peor de la semana: ${fmt(best[best.length - 1])}.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return { thisWeek, prevWeek, text };
+}

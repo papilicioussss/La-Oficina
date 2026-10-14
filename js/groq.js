@@ -1,5 +1,6 @@
 // Cliente mínimo para Groq (API compatible con OpenAI), llamado directo desde el navegador.
 
+import { countCall, countLimitHit } from './usage.js';
 import * as store from './store.js';
 
 const BASE = 'https://api.groq.com/openai/v1';
@@ -63,6 +64,7 @@ function friendlyError(status, body) {
 }
 
 async function request(path, apiKey, init) {
+  const counted = init?.method === 'POST';
   // Una key con espacios, comillas o "…" hace que el navegador rechace la petición antes de enviarla.
   if (!/^[\x21-\x7e]+$/.test(apiKey || '')) {
     throw new GroqError('Tu API key de Groq tiene caracteres raros (espacios, comillas o puntos suspensivos). Cópiala de nuevo desde console.groq.com/keys, sin nada más.', 401);
@@ -80,6 +82,10 @@ async function request(path, apiKey, init) {
         : `Esta página no puede llegar a Groq. Suele ser un bloqueador de anuncios o extensión de privacidad, una VPN o red que bloquea Groq. Prueba en una ventana de incógnito o desactiva las extensiones para esta página. (Detalle: ${e.message || 'error de red'})`,
       0
     );
+  }
+  if (counted) {
+    countCall('groq');
+    if (res.status === 429) countLimitHit('groq');
   }
   if (!res.ok) {
     let j = null;

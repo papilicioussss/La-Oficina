@@ -49,6 +49,9 @@ export const DEFAULTS = {
     skillsOff: [], // ids de skills desactivadas
     skillsPinned: [], // ids de skills que siempre se cargan
     customSkills: [], // skills creadas por Kike
+    limitGemini: 0, // tope diario que Kike anota para recibir un aviso (0 = sin aviso)
+    limitGroq: 0,
+    limitTavily: 0,
     ambientLife: true, // gestos y paseos decorativos de los agentes cuando están libres
   },
   boss: {
@@ -96,6 +99,7 @@ export const DEFAULTS = {
   memory: [],
   meetings: [],
   metrics: [],
+  usage: null, // consultas del día por proveedor (js/usage.js)
   favs: [], // biblioteca de favoritos: copys, guiones, hooks guardados
   fechas: [], // fechas propias de Kike para el calendario
   'chat:copy': [],
