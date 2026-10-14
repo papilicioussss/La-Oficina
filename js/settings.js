@@ -565,6 +565,38 @@ function catCard() {
   );
 }
 
+function ambientCard() {
+  const s = store.settings();
+  return h(
+    'section',
+    { class: 'team-card' },
+    h('strong', null, '🎬 Vida ambiental'),
+    h(
+      'div',
+      { class: 'field mt-3' },
+      h(
+        'label',
+        { class: 'check' },
+        h('input', {
+          type: 'checkbox',
+          checked: s.ambientLife !== false,
+          onChange: (e) => {
+            s.ambientLife = e.target.checked;
+            saveSettings();
+            emit('ambient-changed');
+          },
+        }),
+        'Que tu equipo se sienta vivo cuando está libre'
+      ),
+      h(
+        'span',
+        { class: 'hint' },
+        'Toman café, atienden llamadas, se estiran, tipean un rato o pasean por su oficina. Es solo decoración y solo pasa cuando el agente no está haciendo nada: apenas piensa, busca o entra a una reunión, se corta y ves su estado real ("Pensando…", "Buscando…"). Si tu teléfono o computadora pide "reducir movimiento", se apaga sola.'
+      )
+    )
+  );
+}
+
 function teamTab() {
   const agents = store.agents();
   const wrap = h('div');
@@ -646,6 +678,7 @@ function teamTab() {
       )
     );
   }
+  wrap.append(ambientCard());
   return wrap;
 }
 

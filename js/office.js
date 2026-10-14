@@ -5,7 +5,7 @@ import { s } from './ui.js';
 import { buildCatSprite } from './cat-sprite.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
-import { runtime, on, STATUS_LABEL, go } from './state.js';
+import { runtime, on, emit, STATUS_LABEL, go } from './state.js';
 import { ROLES, catName } from './prompts.js';
 import { TW, TH, iso, P, EDGE, shade, plastic, LEGO, box, quadX, quadY, planeY, mountDefs, softShadow, lightPatch, baseplate } from './lego.js';
 
@@ -618,12 +618,42 @@ function kitParts(look) {
   return out;
 }
 
-export function spriteParts(look, { withLegs = true } = {}) {
+/** Props que solo se ven durante los gestos ambientales (taza y teléfono en la mano derecha). */
+function ambientProps() {
+  const hide = { display: 'none' };
+  return [
+    s(
+      'g',
+      { class: 'amb-prop amb-mug', ...hide },
+      s(
+        'g',
+        { class: 'amb-prop-in' },
+        s('rect', { x: 7.3, y: -17, width: 5.2, height: 5.8, rx: 1, fill: '#ffffff', stroke: '#9a8f7a', 'stroke-width': 0.5 }),
+        s('rect', { x: 7.7, y: -16.6, width: 4.4, height: 1.3, rx: 0.5, fill: '#6b3a2a' }),
+        s('path', { d: 'M12.5 -15.6 q2.2 0.2 2.2 1.7 q0 1.5 -2.2 1.7', stroke: '#9a8f7a', 'stroke-width': 0.9, fill: 'none', 'stroke-linecap': 'round' })
+      )
+    ),
+    s(
+      'g',
+      { class: 'amb-prop amb-phone', ...hide },
+      s(
+        'g',
+        { class: 'amb-prop-in' },
+        s('rect', { x: 8.2, y: -19.4, width: 3.8, height: 7, rx: 0.9, fill: '#1d2433', stroke: '#000', 'stroke-width': 0.3 }),
+        s('rect', { x: 8.7, y: -18.7, width: 2.8, height: 4.6, rx: 0.5, fill: '#5ec8f2' })
+      )
+    ),
+  ];
+}
+
+export function spriteParts(look, { withLegs = true, rig = false } = {}) {
   const shirt = look.shirt || '#008ec7';
   const skin = look.skin || '#c68642';
   const dark = shade(shirt, -0.2);
   const kit = kitParts(look);
   const hand = (x) => s('g', null, s('rect', { x: x - 2.4, y: -14.6, width: 4.8, height: 4.4, rx: 1.8, fill: skin }), s('rect', { x: x - 0.7, y: -13.6, width: 1.4, height: 2.4, rx: 0.7, fill: '#000', opacity: 0.22 }));
+  // Con `rig` cada brazo va en un grupo propio que pivota en el hombro (lo usa la vida ambiental, js/ambient.js) y el derecho lleva props ocultos.
+  const armWrap = (side, arm) => (rig ? s('g', { class: `amb-wrap amb-wrap-${side}` }, arm, ...(side === 'r' ? ambientProps() : [])) : arm);
   const parts = [];
   if (withLegs) {
     parts.push(
@@ -640,8 +670,8 @@ export function spriteParts(look, { withLegs = true } = {}) {
       'g',
       { class: 'body-bob' },
       hairBack(look),
-      s('g', { class: 'arm arm-l' }, s('rect', { x: -12.2, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(-9.8), ...kit.armL),
-      s('g', { class: 'arm arm-r' }, s('rect', { x: 7.4, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(9.8), ...kit.armR),
+      armWrap('l', s('g', { class: 'arm arm-l' }, s('rect', { x: -12.2, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(-9.8), ...kit.armL)),
+      armWrap('r', s('g', { class: 'arm arm-r' }, s('rect', { x: 7.4, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(9.8), ...kit.armR)),
       // cadera
       s('rect', { x: -8.8, y: -12, width: 17.6, height: 4, rx: 1, fill: shade(PANTS, -0.08) }),
       // torso trapezoidal
@@ -728,8 +758,9 @@ function buildChar(id) {
     { class: 'agent', 'data-agent': id, 'data-status': runtime.status[id], role: 'button', tabindex: 0, 'aria-label': `Hablar con ${name}` },
     s('ellipse', { class: 'shadow', cx: 0, cy: 0, rx: 10.5, ry: 4.2, fill: 'rgba(60,35,10,.2)' }),
     s('ellipse', { class: 'select-ring', cx: 0, cy: 0.5, rx: 15, ry: 6.2, fill: 'none' }),
-    s('g', { class: 'sprite' }, ...spriteParts(a.look)),
+    s('g', { class: 'sprite' }, ...spriteParts(a.look, { rig: true })),
     nameTag(w, a.look.shirt, name),
+    s('g', { class: 'amb-fx', transform: 'translate(0,-82)', display: 'none' }, s('text', { 'text-anchor': 'middle', 'font-size': 10 }, '📞')),
     s(
       'g',
       { class: 'bubble', transform: 'translate(0,-78)' },
@@ -1014,6 +1045,7 @@ export function setActiveRoom(room) {
   svgRoot.querySelectorAll('.room-label').forEach((p) => p.classList.toggle('is-active', p.dataset.room === room));
   for (const [id, el] of Object.entries(charEls)) el.classList.toggle('is-selected', id === room);
   setCamera(room);
+  emit('room', room);
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1055,6 +1087,138 @@ export function moveAgent(id, to) {
   walking[id] = (walking[id] || Promise.resolve()).then(() => walk(id, to));
   return walking[id];
 }
+
+// ---------- Vida ambiental: paseos de los agentes cuando están libres (los gestos viven en js/ambient.js) ----------
+// Solo se usan con el agente en reposo en su oficina. Cualquier trabajo real (pensar, buscar, reunión, hablar) los corta al instante.
+
+const AMB_SPEED = 2.6; // unidades por segundo: un paseo tranquilo
+const AMB_EXIT = { copy: [8.7, 4.5], analista: [20.5, 4.5], guion: [8.7, 16.5] }; // por dónde se levanta cada uno de su silla
+// Lugares de su oficina a los que van de paseo: { at: punto, face: hacia dónde miran al llegar }
+const AMB_SPOTS = {
+  copy: { librero: { at: [2.0, 10.8], face: 'away' }, planta: { at: [10.0, 2.7], face: 'away' }, estirar: { at: [9.4, 8.6], face: 'front' } },
+  analista: { servidor: { at: [21.4, 9.4], face: 'front' }, planta: { at: [14.3, 2.7], face: 'away' }, estirar: { at: [15.2, 9.2], face: 'front' } },
+  guion: { camara: { at: [8.6, 21.9], face: 'away' }, planta: { at: [2.7, 21.4], face: 'away' }, estirar: { at: [9.8, 14.6], face: 'front' } },
+};
+const ambWalk = {}; // id -> paseo en curso
+
+function ambPos(st, x, y) {
+  st.x = x;
+  st.y = y;
+  place(st.el, [x, y]);
+  st.el.__mover = true;
+  st.el.__depth = x + y;
+  relayer(st);
+}
+
+function ambFace(st, dx, dy) {
+  const away = dx + dy < -0.01;
+  if (away || dx + dy > 0.01) st.el.classList.toggle('facing-away', away);
+}
+
+/** Recorre una lista de puntos. Devuelve 'ok', 'hurry' (le pidieron volver) o 'cut' (se cortó el paseo). */
+function ambFollow(st, id, path) {
+  return new Promise((resolve) => {
+    let i = 1;
+    let last = 0;
+    const step = (ts) => {
+      if (ambWalk[id] !== st) return resolve('cut');
+      if (st.hurry && !st.returning) return resolve('hurry');
+      const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
+      last = ts;
+      let budget = AMB_SPEED * (st.hurry ? 3 : 1) * dt;
+      while (budget > 0 && i < path.length) {
+        const [tx, ty] = path[i];
+        const dx = tx - st.x;
+        const dy = ty - st.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= budget) {
+          ambPos(st, tx, ty);
+          i++;
+          budget -= d;
+        } else {
+          ambPos(st, st.x + (dx / d) * budget, st.y + (dy / d) * budget);
+          ambFace(st, dx, dy);
+          budget = 0;
+        }
+      }
+      if (i >= path.length) return resolve('ok');
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** El agente vuelve a su silla (sin animación) y recupera su lugar normal en la escena. */
+function ambHome(id, st) {
+  if (ambWalk[id] !== st) return;
+  ambWalk[id] = null;
+  const el = st.el;
+  if (charEls[id] !== el) return;
+  el.style.setProperty('--walk', '0ms');
+  el.classList.remove('walking', 'facing-away');
+  delete el.__mover;
+  delete el.__depth;
+  place(el, SEATS[id]);
+  slots[id].office.append(el);
+  el.getBoundingClientRect();
+  el.style.removeProperty('--walk');
+}
+
+/**
+ * Paseo hasta un lugar de su oficina, una pausa y vuelta a la silla.
+ * Devuelve 'ok' | 'cut' | 'skipped'. `onArrive(el)` se llama al llegar; `hold` es la pausa en ms.
+ */
+async function ambStroll(id, spotKey, { hold = 3500, onArrive } = {}) {
+  const el = charEls[id];
+  const spot = AMB_SPOTS[id]?.[spotKey];
+  if (!el || !spot || ambWalk[id] || reduceMotion() || runtime.location[id] !== 'office' || runtime.status[id] !== 'idle') return 'skipped';
+  const there = findPath(AMB_EXIT[id], spot.at);
+  if (!there) return 'skipped';
+  const st = { el, x: SEATS[id][0], y: SEATS[id][1], hurry: false, returning: false, wake: null };
+  ambWalk[id] = st;
+  el.style.setProperty('--walk', '0ms');
+  el.classList.add('walking');
+  const alive = () => ambWalk[id] === st && charEls[id] === el;
+  try {
+    ambPos(st, st.x, st.y);
+    let r = await ambFollow(st, id, [[st.x, st.y], ...there]);
+    if (r === 'cut' || !alive()) return 'cut';
+    if (r === 'ok') {
+      el.classList.remove('walking');
+      el.classList.toggle('facing-away', spot.face === 'away');
+      onArrive?.(el);
+      await new Promise((res) => {
+        st.wake = res;
+        setTimeout(res, hold);
+      });
+      if (!alive()) return 'cut';
+      el.classList.add('walking');
+    }
+    st.returning = true;
+    const back = findPath([st.x, st.y], AMB_EXIT[id]) || [[st.x, st.y], AMB_EXIT[id]];
+    r = await ambFollow(st, id, [...back, SEATS[id]]);
+    return r === 'ok' ? 'ok' : 'cut';
+  } finally {
+    ambHome(id, st);
+  }
+}
+
+export const ambientApi = {
+  el: (id) => charEls[id],
+  spots: (id) => Object.keys(AMB_SPOTS[id] || {}),
+  stroll: ambStroll,
+  strolling: (id) => !!ambWalk[id],
+  /** 'cut' = volver a la silla ya; 'hurry' = volver caminando rápido. */
+  stop(id, mode = 'cut') {
+    const st = ambWalk[id];
+    if (!st) return;
+    if (mode === 'hurry') {
+      st.hurry = true;
+      st.wake?.();
+    } else ambHome(id, st);
+  },
+  activeRoom: () => activeRoom,
+};
 
 // ---------- Avatar del jefe: caminar por la oficina ----------
 

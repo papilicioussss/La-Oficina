@@ -69,6 +69,10 @@ Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psi
 - **Puedes elegirlas a mano** con el botón "🛠 Manual" del chat.
 - En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
 
+## Vida ambiental de la oficina
+
+Cuando un agente está libre se mueve como en una oficina real: teclea un rato, toma café, contesta una llamada, se estira, mira alrededor o pasea por su oficina (al librero, la planta, el servidor, la cámara…). **Es solo decoración**: ocurre únicamente cuando el agente no está haciendo nada. Apenas piensa, busca, habla o entra a una reunión, el gesto se corta al instante y ves su estado real ("Pensando…", "Buscando…"). Si abres su oficina mientras pasea, vuelve rápido a su silla. Se apaga en **Configuración → Equipo → Vida ambiental**, y se desactiva sola si tu dispositivo pide "reducir movimiento".
+
 ## Favoritos y fechas para vender
 
 - **⭐ Favoritos** (barra de arriba): debajo de cada respuesta de un agente tienes "⭐ Guardar". Le pones título, tipo (copy, hook, guion, análisis) y etiquetas, y luego buscas y filtras en la biblioteca. Desde ahí lo copias, se lo pasas a Nico, Alex o Sam, lo editas o lo borras. Va incluido en el respaldo de Configuración → Datos.
@@ -144,6 +148,7 @@ js/memory.js          memoria de la marca
 js/skills-data.js     biblioteca de skills de marketing
 js/skills.js          selección de skills según la consulta
 js/skills-ai.js       "Elegir skills por mí" con IA (opcional)
+js/ambient.js         vida ambiental (gestos y paseos cuando están libres)
 js/favs.js            biblioteca de favoritos
 js/calendar-ve.js     feriados, puentes y fechas comerciales de Venezuela
 js/calendar-view.js   vista "Fechas"

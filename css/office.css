@@ -359,6 +359,11 @@
   text-rendering: geometricPrecision;
 }
 
+/* Vida ambiental: boca que se mueve durante una llamada decorativa (no es el estado "hablando" real) */
+.agent.amb-talk .mouth {
+  animation: talk 0.26s ease-in-out infinite alternate;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .office-svg *,
   .agent,

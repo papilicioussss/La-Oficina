@@ -49,6 +49,7 @@ export const DEFAULTS = {
     skillsOff: [], // ids de skills desactivadas
     skillsPinned: [], // ids de skills que siempre se cargan
     customSkills: [], // skills creadas por Kike
+    ambientLife: true, // gestos y paseos decorativos de los agentes cuando están libres
   },
   boss: {
     name: 'Kike',

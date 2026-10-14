@@ -12,6 +12,7 @@ import { renderAgentPanel } from './chat.js';
 import { renderMeetingPanel, recoverMeetings } from './meeting.js';
 import { renderSettings } from './settings.js';
 import { renderFavs } from './favs.js';
+import { startAmbient } from './ambient.js';
 import { renderCalendar } from './calendar-view.js';
 import { recoverChats } from './conversation.js';
 
@@ -161,6 +162,7 @@ function start() {
   recoverCatChat();
   recoverMeetings();
   mountOffice(document.getElementById('office'));
+  startAmbient();
   window.addEventListener('hashchange', route);
   on('route', () => {
     currentKey = '';
