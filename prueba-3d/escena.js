@@ -27,8 +27,6 @@ export function construirEscena() {
       k.ladrillo({ x: xx, y, z: 0, w, d: 1, color: colores[(hilera + xx) % 2] });
     }
   }
-  // ventana: marco azul y vidrio
-  for (let i = 0; i < 4; i++) k.azulejo({ x: 5 + i, y: 2.8, z: 0, w: 1, d: 1, color: PALETA.azul });
 
   // escritorio naranja con patas de 1x1 y tapa blanca
   const dx = 4;
@@ -40,14 +38,15 @@ export function construirEscena() {
   k.ladrillo({ x: dx + 1, y: 3.2, z: dz + 1, w: 4, d: 1, alto: 1.2, color: PALETA.oscuro, taquitos: false });
   k.azulejo({ x: dx + 1, y: 4.4, z: dz + 1, w: 4, d: 1, color: PALETA.azul });
   // silla roja
-  k.ladrillo({ x: dx + 2, y: 0.4, z: dz + 4, w: 2, d: 2, color: PALETA.rojo });
-  k.placa({ x: dx + 1, y: 1.6, z: dz + 4, w: 4, d: 3, color: PALETA.rojo });
-  k.ladrillo({ x: dx + 1, y: 2.0, z: dz + 6, w: 4, d: 1, color: PALETA.rojo });
+  // (detrás del escritorio, para que no tape a los personajes en la vista inicial)
+  k.ladrillo({ x: dx + 2, y: 0.4, z: dz - 3.5, w: 2, d: 2, color: PALETA.rojo });
+  k.placa({ x: dx + 1, y: 1.6, z: dz - 4, w: 4, d: 3, color: PALETA.rojo });
+  k.ladrillo({ x: dx + 1, y: 2.0, z: dz - 4.5, w: 4, d: 1, color: PALETA.rojo });
 
   // escalera de colores clásicos
-  [PALETA.rojo, PALETA.amarillo, PALETA.azul, PALETA.verde].forEach((c, i) => k.ladrillo({ x: 12, y: 0.4 + 1.2 * i - 1.2 * 0, z: 11 + 0, w: 2 + 0, d: 4 - i, color: c }));
+  [PALETA.rojo, PALETA.amarillo, PALETA.azul, PALETA.verde].forEach((c, i) => k.ladrillo({ x: 12, y: 0.4 + 1.2 * i, z: 1, w: 2, d: 4 - i, color: c }));
   // planta: maceta marrón y hojas
-  k.ladrillo({ x: 13, y: 0.4, z: 3, w: 2, d: 2, color: PALETA.marron });
+  k.ladrillo({ x: 13.5, y: 0.4, z: 8.5, w: 2, d: 2, color: PALETA.marron });
 
   const mundo = new THREE.Group();
   mundo.add(k.terminar());
@@ -55,7 +54,7 @@ export function construirEscena() {
   // hojas de la planta (piezas redondeadas)
   const hoja = plastico('#2a9a55');
   const hojas = new THREE.Group();
-  hojas.position.set(14, 1.6, 4);
+  hojas.position.set(14.5, 1.6, 9.5);
   for (let i = 0; i < 6; i++) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.75, 18, 14), hoja);
     const a = (i / 6) * Math.PI * 2;
@@ -69,12 +68,12 @@ export function construirEscena() {
 
   // minifiguras: se piden al registro de modelos (hoy son provisionales hechas por código; mañana pueden ser modelos detallados)
   const nico = crearModelo('minifigura', { camisa: PALETA.naranja, gorra: PALETA.naranja, semilla: 3 });
-  nico.objeto.position.set(dx - 1.6, 0.4, dz + 1.5);
+  nico.objeto.position.set(2.3, 0.4, 9.2);
   nico.objeto.scale.setScalar(0.85);
   nico.objeto.rotation.y = 0.55; // el frente (+z) del personaje apunta hacia la cámara de la vista isométrica (≈0.79 rad)
   mundo.add(nico.objeto);
   const alex = crearModelo('minifigura', { camisa: PALETA.azul, pantalon: '#2b2f3a', semilla: 11 });
-  alex.objeto.position.set(9.5, 0.4, 12.5);
+  alex.objeto.position.set(11.5, 0.4, 12.5);
   alex.objeto.scale.setScalar(0.85);
   alex.objeto.rotation.y = 0.95;
   mundo.add(alex.objeto);

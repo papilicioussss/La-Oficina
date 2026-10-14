@@ -65,9 +65,9 @@ function semilla(n) {
 const manos = new Map();
 function geometriaMano(lado) {
   if (manos.has(lado)) return manos.get(lado);
-  const Rm = 0.215; // radio medio
-  const w = 0.065; // medio grosor de la pared
-  const alto = 0.36;
+  const Rm = 0.235; // radio medio
+  const w = 0.07; // medio grosor de la pared
+  const alto = 0.4;
   const bisel = 0.025;
   const centro = -Math.PI / 2 + lado * 0.38; // dirección de la abertura en el plano de la forma: -y de la forma = +z del mundo tras acostarla, y un poco hacia afuera
   const medio = 0.88; // semi-apertura (~50°)
@@ -147,9 +147,9 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     const hombro = grupo(lado * 1.28, 1.51, 0);
     hombro.add(malla(new THREE.SphereGeometry(0.29, 16, 12), mCamisa, 0, -0.04, 0)); // tapa la unión con el torso
     hombro.add(malla(caja(0.56, 1.5, 0.62, 0.1), mCamisa, 0, -0.72, 0));
-    hombro.add(malla(new THREE.CylinderGeometry(0.11, 0.11, 0.26, 14), mPiel, 0, -1.55, 0)); // muñeca (pasador)
-    const muneca = grupo(0, -1.66, 0);
-    muneca.add(malla(geometriaMano(lado), mPiel, 0, -0.17, 0)); // la mano cuelga justo debajo del pasador
+    hombro.add(malla(new THREE.CylinderGeometry(0.115, 0.115, 0.2, 14), mPiel, 0, -1.52, 0)); // muñeca (pasador corto, asoma ~0.12 bajo la manga)
+    const muneca = grupo(0, -1.6, 0);
+    muneca.add(malla(geometriaMano(lado), mPiel, 0, -0.19, 0)); // la mano encaja contra el pasador, sin hueco con la manga
     hombro.add(muneca);
     return { hombro, muneca };
   };
@@ -410,8 +410,11 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     // las manos se "arrastran" un poco detrás del brazo (movimiento secundario): se doblan en contra de su velocidad
     const arrI = limitar(-VEL.bIx * 0.06, -0.15, 0.15);
     const arrD = limitar(-VEL.bDx * 0.06, -0.15, 0.15);
-    bI.muneca.rotation.set(limitar(P.mI + rap.mI + arrI, ...LIM.muneca), 0, 0);
-    bD.muneca.rotation.set(limitar(P.mD + rap.mD + arrD, ...LIM.muneca), limitar(P.rD, ...LIM.giro), 0);
+    // compensación: cuando el brazo se adelanta, la muñeca se flexiona para que la mano no apunte hacia el frente con el brazo
+    const compI = -P.bIx * 0.45;
+    const compD = -P.bDx * 0.45;
+    bI.muneca.rotation.set(limitar(P.mI + rap.mI + arrI + compI, ...LIM.muneca), 0, 0);
+    bD.muneca.rotation.set(limitar(P.mD + rap.mD + arrD + compD, ...LIM.muneca), limitar(P.rD, ...LIM.giro), 0);
     piernaI.rotation.x = limitar(P.pI, ...LIM.pierna);
     piernaD.rotation.x = limitar(P.pD, ...LIM.pierna);
     // cara: parpadeo discreto (cierra y abre en ~0.18 s, solo los ojos) y la expresión continua

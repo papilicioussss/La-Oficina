@@ -61,11 +61,11 @@ controles.autoRotateSpeed = 1.2;
 function vistaIsometrica() {
   // en pantallas altas (celular vertical) se aleja más para que la plataforma quepa completa
   const aspecto = lienzo.clientWidth / Math.max(1, lienzo.clientHeight);
-  const d = 34 * Math.max(1, 1.2 / aspecto);
+  const d = 30 * Math.max(1, 1.2 / aspecto);
   const az = Math.PI / 4;
   const el = Math.atan(1 / Math.SQRT2); // ángulo isométrico clásico (≈35°)
   camara.position.set(Math.sin(az) * Math.cos(el) * d, Math.sin(el) * d, Math.cos(az) * Math.cos(el) * d);
-  controles.target.set(0, 1.5, 0);
+  controles.target.set(0, 2, 0);
   controles.update();
 }
 vistaIsometrica();
@@ -119,8 +119,13 @@ function redimensionar() {
   const h = lienzo.clientHeight;
   renderer.setSize(w, h, false);
   camara.aspect = w / h;
+  // con el panel abierto en pantallas anchas se desplaza la imagen a la derecha para que el panel no tape la escena
+  const panelAbierto = $('panel').open && w >= 900;
+  if (panelAbierto) camara.setViewOffset(w, h, -120, 0, w, h);
+  else camara.clearViewOffset();
   camara.updateProjectionMatrix();
 }
+$('panel').addEventListener('toggle', redimensionar);
 addEventListener('resize', redimensionar);
 aplicarCalidad(nivelActual);
 
