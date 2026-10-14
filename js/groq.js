@@ -30,8 +30,12 @@ async function request(path, apiKey, init) {
     res = await fetch(BASE + path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` } });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
+    // ¿La página llega a Groq sin la key? Así se distingue "red bloqueada" de "petición con key bloqueada".
+    const reachable = await fetch(BASE + '/models').then(() => true, () => false);
     throw new GroqError(
-      `No pude conectar con Groq. Suele ser un bloqueador de anuncios o extensión de privacidad, una VPN o red que bloquea Groq, o que Groq no está disponible en tu red o región. Prueba abrir api.groq.com en otra pestaña o desactivar extensiones para esta página. (Detalle: ${e.message || 'error de red'})`,
+      reachable
+        ? `Groq sí responde desde tu navegador, pero esta petición con tu key no llegó. Revisa que la key esté completa, sin espacios ni comillas (vuelve a copiarla de console.groq.com/keys). Si sigue igual, prueba en una ventana de incógnito o desactiva las extensiones de privacidad para esta página. (Detalle: ${e.message || 'error de red'})`
+        : `Esta página no puede llegar a Groq. Suele ser un bloqueador de anuncios o extensión de privacidad, una VPN o red que bloquea Groq. Prueba en una ventana de incógnito o desactiva las extensiones para esta página. (Detalle: ${e.message || 'error de red'})`,
       0
     );
   }
