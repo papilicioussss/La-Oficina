@@ -18,7 +18,7 @@ const TABS = [
   ['datos', '💾 Datos'],
 ];
 
-const SHIRTS = ['#ff6b5b', '#0e9aa7', '#7a5af8', '#ffb627', '#2e9d5b', '#2f6fd1', '#e05297', '#3b4252'];
+const SHIRTS = ['#ff8a3d', '#008ec7', '#00a100', '#fde07e', '#324966', '#00b9ec', '#30bb4f', '#e05297'];
 const SKINS = ['#f6d3b3', '#e0ac69', '#c68642', '#8d5524', '#5c3a1e'];
 const HAIRS = ['#0f0f0f', '#2b1b12', '#6b3e1f', '#b5651d', '#e8c07d', '#9aa0a6', '#ff6b5b', '#2f6fd1'];
 const HAIR_STYLES = [
@@ -438,7 +438,7 @@ function bossCard() {
     h(
       'div',
       { class: 'form-grid' },
-      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Camisa'), swatches([...SHIRTS, '#1d2433', '#e7b84a'], b.look.shirt, (c) => ((b.look.shirt = c), refresh()))),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Camisa'), swatches([...SHIRTS, '#1a1e1c', '#7a5af8'], b.look.shirt, (c) => ((b.look.shirt = c), refresh()))),
       h('div', { class: 'field' }, h('span', { class: 'label' }, 'Tono de piel'), swatches(SKINS, b.look.skin, (c) => ((b.look.skin = c), refresh()))),
       h('div', { class: 'field' }, h('span', { class: 'label' }, 'Peinado'), hairStyle),
       h('div', { class: 'field' }, h('span', { class: 'label' }, 'Color de pelo / gorra'), swatches(HAIRS, b.look.hair, (c) => ((b.look.hair = c), refresh())))

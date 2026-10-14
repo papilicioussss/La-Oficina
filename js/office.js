@@ -43,7 +43,8 @@ const WOOD = ['#f0cd98', '#d9ac6c', '#c39457'];
 const DARK_WOOD = ['#c48d5c', '#a87545', '#8f6239'];
 const CHAIR = ['#8a98b4', '#717f9c', '#5f6c88'];
 
-const ROOM_TINT = { copy: '#ffe3d8', analista: '#d5f0ee', guion: '#e8e1fb', juntas: '#f1dab2', kike: '#fff0c4' };
+// Pisos con los colores de la marca: naranja (Copy), azul (Análisis), verde (Guiones), amarillo (juntas), azul marino claro (jefe)
+const ROOM_TINT = { copy: '#ffe5cc', analista: '#d2effb', guion: '#d6f1da', juntas: '#fdf0bd', kike: '#dde5f0' };
 // [x, y, ancho, fondo] de cada sala
 const ROOM_AREA = {
   copy: [0, 0, 12, 12],
@@ -152,10 +153,10 @@ function staticScene() {
   g.append(lines);
   // Alfombras
   g.append(
-    s('polygon', { points: P([[3.4, 3.0, 0.01], [9.4, 3.0, 0.01], [9.4, 8.6, 0.01], [3.4, 8.6, 0.01]]), fill: '#ffc9b8', opacity: 0.8, 'pointer-events': 'none' }),
-    s('polygon', { points: P([[15.3, 3.0, 0.01], [21.3, 3.0, 0.01], [21.3, 8.6, 0.01], [15.3, 8.6, 0.01]]), fill: '#b2e4e0', opacity: 0.8, 'pointer-events': 'none' }),
-    s('polygon', { points: P([[3.4, 15.0, 0.01], [9.4, 15.0, 0.01], [9.4, 20.6, 0.01], [3.4, 20.6, 0.01]]), fill: '#d6cbfa', opacity: 0.8, 'pointer-events': 'none' }),
-    s('polygon', { points: P([[15.0, 25.8, 0.01], [21.4, 25.8, 0.01], [21.4, 31.6, 0.01], [15.0, 31.6, 0.01]]), fill: '#ffd98a', opacity: 0.75, 'pointer-events': 'none' })
+    s('polygon', { points: P([[3.4, 3.0, 0.01], [9.4, 3.0, 0.01], [9.4, 8.6, 0.01], [3.4, 8.6, 0.01]]), fill: '#ffb67a', opacity: 0.8, 'pointer-events': 'none' }),
+    s('polygon', { points: P([[15.3, 3.0, 0.01], [21.3, 3.0, 0.01], [21.3, 8.6, 0.01], [15.3, 8.6, 0.01]]), fill: '#8fd6f1', opacity: 0.8, 'pointer-events': 'none' }),
+    s('polygon', { points: P([[3.4, 15.0, 0.01], [9.4, 15.0, 0.01], [9.4, 20.6, 0.01], [3.4, 20.6, 0.01]]), fill: '#9ddba6', opacity: 0.8, 'pointer-events': 'none' }),
+    s('polygon', { points: P([[15.0, 25.8, 0.01], [21.4, 25.8, 0.01], [21.4, 31.6, 0.01], [15.0, 31.6, 0.01]]), fill: '#fde07e', opacity: 0.8, 'pointer-events': 'none' })
   );
 
   // Paredes del fondo
@@ -175,9 +176,20 @@ function staticScene() {
   );
   // Copy: ventana con playa + letrero de la marca
   walls.append(beachWindow('y', 2.5, 9.5, 2.0, 5.0));
-  walls.append(s('polygon', { points: quadX(2, 9.5, 3.0, 5.2, 0.02), fill: '#0e9aa7', ...EDGE }));
-  walls.append(wallText('x', 5.75, 4.3, 'VACILANDO ANDO', 12.5, { fill: '#ffffff', 'letter-spacing': 0.5 }));
-  walls.append(wallText('x', 5.75, 3.45, 'T O U R S  ✈', 7.5, { fill: '#ffe08a' }));
+  walls.append(s('polygon', { points: quadX(1.2, 10.8, 2.8, 5.4, 0.02), fill: '#324966', ...EDGE }));
+  const [lgx, lgy] = iso(0.03, 9.9, 2.95);
+  walls.append(
+    s('image', {
+      href: 'assets/logo-256.png',
+      x: 0,
+      y: -40,
+      width: 40,
+      height: 40,
+      transform: `matrix(0.8944,-0.4472,0,1,${lgx},${lgy + 0})`,
+    })
+  );
+  walls.append(wallText('x', 4.5, 4.45, 'VACILANDO ANDO', 11, { fill: '#fcfcf7', 'letter-spacing': 0.4 }));
+  walls.append(wallText('x', 4.5, 3.6, 'T O U R S  ✈', 7.5, { fill: '#fde07e' }));
   // Analista: pantalla con gráfico
   walls.append(s('polygon', { points: quadY(13.8, 21.2, 2.2, 5.2, 0.02), fill: '#13202b', stroke: '#0b141b', 'stroke-width': 1 }));
   const bars = [0.9, 1.4, 1.1, 1.9, 1.6, 2.4];
@@ -215,7 +227,7 @@ function roomItems(room) {
   const add = (depth, node, b) => items.push({ depth, node, b });
   if (room === 'copy') {
     add(1.0, box(0.1, 9.9, 0, 0.9, 1.8, 2.8, WOOD), [0.1, 9.9, 1.0, 11.7]);
-    ['#ff6b5b', '#0e9aa7', '#ffb627', '#7a5af8'].forEach((c, i) =>
+    ['#ff8a3d', '#008ec7', '#fde07e', '#00a100'].forEach((c, i) =>
       add(1.1, s('polygon', { points: quadX(10.05 + i * 0.4, 10.35 + i * 0.4, 1.6, 2.5, 1.01), fill: c }), [0.1, 9.9, 1.0, 11.7])
     );
     add(12.1, plant(10.8, 1.3), [10.4, 0.9, 11.2, 1.7]);
@@ -223,7 +235,7 @@ function roomItems(room) {
     add(12.3, box(4.6, 5.6, 0, 3.4, 1.5, 1.25, WOOD), [4.6, 5.6, 8.0, 7.1]);
     add(12.4, box(5.0, 5.9, 1.25, 1.3, 0.8, 0.08, '#9aa3b2'), [4.6, 5.6, 8.0, 7.1]);
     add(12.5, s('polygon', { points: P([[5.0, 5.95, 1.33], [6.3, 5.95, 1.33], [6.3, 5.8, 2.25], [5.0, 5.8, 2.25]]), fill: '#3b4252', ...EDGE }), [4.6, 5.6, 8.0, 7.1]);
-    add(12.6, s('circle', { cx: iso(5.65, 5.9, 1.8)[0], cy: iso(5.65, 5.9, 1.8)[1], r: 2.2, fill: '#ff6b5b' }), [4.6, 5.6, 8.0, 7.1]);
+    add(12.6, s('circle', { cx: iso(5.65, 5.9, 1.8)[0], cy: iso(5.65, 5.9, 1.8)[1], r: 2.2, fill: '#ff8a3d' }), [4.6, 5.6, 8.0, 7.1]);
     add(12.7, box(7.3, 6.3, 1.25, 0.35, 0.35, 0.4, ['#ffffff', '#ececec', '#d9d9d9']), [4.6, 5.6, 8.0, 7.1]);
   }
   if (room === 'analista') {
@@ -352,7 +364,7 @@ function hairBack(look) {
 }
 
 export function spriteParts(look, { withLegs = true } = {}) {
-  const shirt = look.shirt || '#0e9aa7';
+  const shirt = look.shirt || '#008ec7';
   const skin = look.skin || '#c68642';
   const dark = shade(shirt, -0.2);
   const parts = [];
