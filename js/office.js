@@ -1,4 +1,5 @@
-// Oficina isométrica animada (SVG): 3 oficinas + sala de juntas, con personajes que caminan.
+// Oficina isométrica animada (SVG): 3 oficinas, la oficina del jefe y la sala de juntas,
+// con personajes que caminan y el avatar del jefe que se mueve por la oficina.
 
 import { s } from './ui.js';
 import * as store from './store.js';
@@ -42,12 +43,14 @@ const WOOD = ['#f0cd98', '#d9ac6c', '#c39457'];
 const DARK_WOOD = ['#c48d5c', '#a87545', '#8f6239'];
 const CHAIR = ['#8a98b4', '#717f9c', '#5f6c88'];
 
-const ROOM_TINT = { copy: '#ffe3d8', analista: '#d5f0ee', guion: '#e8e1fb', juntas: '#f1dab2' };
+const ROOM_TINT = { copy: '#ffe3d8', analista: '#d5f0ee', guion: '#e8e1fb', juntas: '#f1dab2', kike: '#fff0c4' };
+// [x, y, ancho, fondo] de cada sala
 const ROOM_AREA = {
-  copy: [0, 0],
-  analista: [12, 0],
-  guion: [0, 12],
-  juntas: [12, 12],
+  copy: [0, 0, 12, 12],
+  analista: [12, 0, 12, 12],
+  guion: [0, 12, 12, 12],
+  juntas: [12, 12, 12, 12],
+  kike: [12, 24, 12, 10],
 };
 
 const SEATS = { copy: [6.3, 4.6], analista: [18.2, 4.6], guion: [6.3, 16.6] };
@@ -112,13 +115,14 @@ function staticScene() {
   const g = s('g', { class: 'scene-static' });
   // Losa del piso
   g.append(box(0, 0, -0.7, 24, 24, 0.7, ['#e3c79a', '#cfae7a', '#b9965f']));
+  g.append(box(12, 24, -0.7, 12, 10, 0.7, ['#e3c79a', '#cfae7a', '#b9965f']));
   // Pisos de cada sala (clicables)
-  for (const [room, [ox, oy]] of Object.entries(ROOM_AREA)) {
-    const label = room === 'juntas' ? 'Sala de juntas' : `${ROLES[room].room}`;
+  for (const [room, [ox, oy, w, d]] of Object.entries(ROOM_AREA)) {
+    const label = room === 'juntas' ? 'Sala de juntas' : room === 'kike' ? 'Tu oficina' : `${ROLES[room].room}`;
     const poly = s('polygon', {
       class: 'room-floor',
       'data-room': room,
-      points: P([[ox + 0.25, oy + 0.25, 0], [ox + 11.75, oy + 0.25, 0], [ox + 11.75, oy + 11.75, 0], [ox + 0.25, oy + 11.75, 0]]),
+      points: P([[ox + 0.25, oy + 0.25, 0], [ox + w - 0.25, oy + 0.25, 0], [ox + w - 0.25, oy + d - 0.25, 0], [ox + 0.25, oy + d - 0.25, 0]]),
       fill: ROOM_TINT[room],
       role: 'button',
       tabindex: 0,
@@ -135,12 +139,23 @@ function staticScene() {
     const [c2, d2] = iso(24, k);
     lines.append(s('line', { x1: a1, y1: b1, x2: a2, y2: b2 }), s('line', { x1: c1, y1: d1, x2: c2, y2: d2 }));
   }
+  for (let k = 14; k < 24; k += 2) {
+    const [a1, b1] = iso(k, 24);
+    const [a2, b2] = iso(k, 34);
+    lines.append(s('line', { x1: a1, y1: b1, x2: a2, y2: b2 }));
+  }
+  for (let k = 26; k < 34; k += 2) {
+    const [c1, d1] = iso(12, k);
+    const [c2, d2] = iso(24, k);
+    lines.append(s('line', { x1: c1, y1: d1, x2: c2, y2: d2 }));
+  }
   g.append(lines);
   // Alfombras
   g.append(
     s('polygon', { points: P([[3.4, 3.0, 0.01], [9.4, 3.0, 0.01], [9.4, 8.6, 0.01], [3.4, 8.6, 0.01]]), fill: '#ffc9b8', opacity: 0.8, 'pointer-events': 'none' }),
     s('polygon', { points: P([[15.3, 3.0, 0.01], [21.3, 3.0, 0.01], [21.3, 8.6, 0.01], [15.3, 8.6, 0.01]]), fill: '#b2e4e0', opacity: 0.8, 'pointer-events': 'none' }),
-    s('polygon', { points: P([[3.4, 15.0, 0.01], [9.4, 15.0, 0.01], [9.4, 20.6, 0.01], [3.4, 20.6, 0.01]]), fill: '#d6cbfa', opacity: 0.8, 'pointer-events': 'none' })
+    s('polygon', { points: P([[3.4, 15.0, 0.01], [9.4, 15.0, 0.01], [9.4, 20.6, 0.01], [3.4, 20.6, 0.01]]), fill: '#d6cbfa', opacity: 0.8, 'pointer-events': 'none' }),
+    s('polygon', { points: P([[15.0, 25.8, 0.01], [21.4, 25.8, 0.01], [21.4, 31.6, 0.01], [15.0, 31.6, 0.01]]), fill: '#ffd98a', opacity: 0.75, 'pointer-events': 'none' })
   );
 
   // Paredes del fondo
@@ -191,39 +206,42 @@ function staticScene() {
   return g;
 }
 
-/** Elementos de cada sala con su profundidad (para dibujar de atrás hacia adelante). */
+/**
+ * Elementos de cada sala con su profundidad (para dibujar de atrás hacia adelante).
+ * `b` = huella [x1, y1, x2, y2] en el piso: sirve para saber si el avatar del jefe queda delante o detrás.
+ */
 function roomItems(room) {
   const items = [];
-  const add = (depth, node) => items.push({ depth, node });
+  const add = (depth, node, b) => items.push({ depth, node, b });
   if (room === 'copy') {
-    add(1.0, box(0.1, 9.9, 0, 0.9, 1.8, 2.8, WOOD));
+    add(1.0, box(0.1, 9.9, 0, 0.9, 1.8, 2.8, WOOD), [0.1, 9.9, 1.0, 11.7]);
     ['#ff6b5b', '#0e9aa7', '#ffb627', '#7a5af8'].forEach((c, i) =>
-      add(1.1, s('polygon', { points: quadX(10.05 + i * 0.4, 10.35 + i * 0.4, 1.6, 2.5, 1.01), fill: c }))
+      add(1.1, s('polygon', { points: quadX(10.05 + i * 0.4, 10.35 + i * 0.4, 1.6, 2.5, 1.01), fill: c }), [0.1, 9.9, 1.0, 11.7])
     );
-    add(12.1, plant(10.8, 1.3));
-    add(9.3, box(5.7, 3.6, 0, 1.2, 0.3, 2.3, CHAIR));
-    add(12.3, box(4.6, 5.6, 0, 3.4, 1.5, 1.25, WOOD));
-    add(12.4, box(5.0, 5.9, 1.25, 1.3, 0.8, 0.08, '#9aa3b2'));
-    add(12.5, s('polygon', { points: P([[5.0, 5.95, 1.33], [6.3, 5.95, 1.33], [6.3, 5.8, 2.25], [5.0, 5.8, 2.25]]), fill: '#3b4252', ...EDGE }));
-    add(12.6, s('circle', { cx: iso(5.65, 5.9, 1.8)[0], cy: iso(5.65, 5.9, 1.8)[1], r: 2.2, fill: '#ff6b5b' }));
-    add(12.7, box(7.3, 6.3, 1.25, 0.35, 0.35, 0.4, ['#ffffff', '#ececec', '#d9d9d9']));
+    add(12.1, plant(10.8, 1.3), [10.4, 0.9, 11.2, 1.7]);
+    add(9.3, box(5.7, 3.6, 0, 1.2, 0.3, 2.3, CHAIR), [5.7, 3.6, 6.9, 3.9]);
+    add(12.3, box(4.6, 5.6, 0, 3.4, 1.5, 1.25, WOOD), [4.6, 5.6, 8.0, 7.1]);
+    add(12.4, box(5.0, 5.9, 1.25, 1.3, 0.8, 0.08, '#9aa3b2'), [4.6, 5.6, 8.0, 7.1]);
+    add(12.5, s('polygon', { points: P([[5.0, 5.95, 1.33], [6.3, 5.95, 1.33], [6.3, 5.8, 2.25], [5.0, 5.8, 2.25]]), fill: '#3b4252', ...EDGE }), [4.6, 5.6, 8.0, 7.1]);
+    add(12.6, s('circle', { cx: iso(5.65, 5.9, 1.8)[0], cy: iso(5.65, 5.9, 1.8)[1], r: 2.2, fill: '#ff6b5b' }), [4.6, 5.6, 8.0, 7.1]);
+    add(12.7, box(7.3, 6.3, 1.25, 0.35, 0.35, 0.4, ['#ffffff', '#ececec', '#d9d9d9']), [4.6, 5.6, 8.0, 7.1]);
   }
   if (room === 'analista') {
-    add(14.5, plant(13.2, 1.3));
-    add(21.3, box(17.6, 3.6, 0, 1.2, 0.3, 2.3, CHAIR));
-    add(24.3, box(16.4, 5.6, 0, 3.6, 1.5, 1.25, WOOD));
-    add(24.4, box(16.95, 6.2, 1.25, 0.25, 0.25, 0.35, '#3b4252'));
-    add(24.5, s('polygon', { points: P([[16.5, 6.25, 1.6], [17.8, 6.25, 1.6], [17.8, 6.1, 2.6], [16.5, 6.1, 2.6]]), fill: '#2d3440', ...EDGE }));
-    add(24.6, box(19.3, 6.2, 1.25, 0.5, 0.5, 0.12, '#22b8c4'));
-    add(31.0, box(22.4, 8.6, 0, 1.2, 1.6, 2.2, ['#d7dde4', '#b9c3cf', '#a3aebb']));
+    add(14.5, plant(13.2, 1.3), [12.8, 0.9, 13.6, 1.7]);
+    add(21.3, box(17.6, 3.6, 0, 1.2, 0.3, 2.3, CHAIR), [17.6, 3.6, 18.8, 3.9]);
+    add(24.3, box(16.4, 5.6, 0, 3.6, 1.5, 1.25, WOOD), [16.4, 5.6, 20.0, 7.1]);
+    add(24.4, box(16.95, 6.2, 1.25, 0.25, 0.25, 0.35, '#3b4252'), [16.4, 5.6, 20.0, 7.1]);
+    add(24.5, s('polygon', { points: P([[16.5, 6.25, 1.6], [17.8, 6.25, 1.6], [17.8, 6.1, 2.6], [16.5, 6.1, 2.6]]), fill: '#2d3440', ...EDGE }), [16.4, 5.6, 20.0, 7.1]);
+    add(24.6, box(19.3, 6.2, 1.25, 0.5, 0.5, 0.12, '#22b8c4'), [16.4, 5.6, 20.0, 7.1]);
+    add(31.0, box(22.4, 8.6, 0, 1.2, 1.6, 2.2, ['#d7dde4', '#b9c3cf', '#a3aebb']), [22.4, 8.6, 23.6, 10.2]);
   }
   if (room === 'guion') {
-    add(14.0, plant(1.4, 22.6));
-    add(21.3, box(5.7, 15.6, 0, 1.2, 0.3, 2.3, CHAIR));
-    add(24.3, box(4.6, 17.6, 0, 3.4, 1.5, 1.25, WOOD));
-    add(24.4, box(5.0, 18.0, 1.25, 1.0, 0.7, 0.12, '#1d2433'));
-    add(24.5, box(5.0, 18.0, 1.37, 1.0, 0.18, 0.12, ['#ffffff', '#1d2433', '#1d2433']));
-    add(24.6, box(6.8, 18.1, 1.25, 0.9, 0.6, 0.05, ['#fffdf5', '#eee5d2', '#e0d6c0']));
+    add(14.0, plant(1.4, 22.6), [1.0, 22.2, 1.8, 23.0]);
+    add(21.3, box(5.7, 15.6, 0, 1.2, 0.3, 2.3, CHAIR), [5.7, 15.6, 6.9, 15.9]);
+    add(24.3, box(4.6, 17.6, 0, 3.4, 1.5, 1.25, WOOD), [4.6, 17.6, 8.0, 19.1]);
+    add(24.4, box(5.0, 18.0, 1.25, 1.0, 0.7, 0.12, '#1d2433'), [4.6, 17.6, 8.0, 19.1]);
+    add(24.5, box(5.0, 18.0, 1.37, 1.0, 0.18, 0.12, ['#ffffff', '#1d2433', '#1d2433']), [4.6, 17.6, 8.0, 19.1]);
+    add(24.6, box(6.8, 18.1, 1.25, 0.9, 0.6, 0.05, ['#fffdf5', '#eee5d2', '#e0d6c0']), [4.6, 17.6, 8.0, 19.1]);
     // cámara en trípode
     const [tx, ty] = iso(9.6, 20.6, 0);
     const [cx, cy] = iso(9.6, 20.6, 2.4);
@@ -234,30 +252,67 @@ function roomItems(room) {
         null,
         s('path', { d: `M${tx - 7} ${ty + 2} L${cx} ${cy} L${tx + 7} ${ty + 2} M${cx} ${cy} L${tx} ${ty + 5}`, stroke: '#3b4252', 'stroke-width': 1.6, fill: 'none' }),
         box(9.3, 20.3, 2.4, 0.7, 0.6, 0.55, '#2d3440')
-      )
+      ),
+      [9.0, 20.1, 10.2, 21.1]
     );
   }
   if (room === 'juntas') {
-    [15.9, 18.0, 20.1].forEach((cx, i) => add(30.5 + i * 0.01, box(cx - 0.6, 15.25, 0, 1.2, 0.3, 2.3, CHAIR)));
-    add(40, box(14.6, 17.2, 0, 6.8, 2.6, 1.25, DARK_WOOD));
-    add(40.1, box(16.0, 17.9, 1.25, 0.8, 0.6, 0.04, ['#fffdf5', '#eee5d2', '#e0d6c0']));
-    add(40.2, box(19.2, 18.2, 1.25, 0.3, 0.3, 0.35, ['#ffffff', '#ececec', '#d9d9d9']));
-    add(41, box(17.4, 20.3, 0, 1.2, 1.1, 0.75, CHAIR));
-    add(41.1, box(17.4, 21.3, 0, 1.2, 0.25, 2.0, CHAIR));
-    add(43, box(22.3, 19.4, 0, 1.3, 2.4, 1.2, WOOD));
-    add(43.1, box(22.6, 19.8, 1.2, 0.7, 0.7, 0.9, '#3b4252'));
-    add(43.2, box(22.7, 20.9, 1.2, 0.35, 0.35, 0.35, ['#ffffff', '#ececec', '#d9d9d9']));
-    add(25.6, plant(23.0, 13.2));
-    add(35.9, plant(13.2, 23.0));
+    [15.9, 18.0, 20.1].forEach((cx, i) => add(30.5 + i * 0.01, box(cx - 0.6, 15.25, 0, 1.2, 0.3, 2.3, CHAIR), [cx - 0.6, 15.25, cx + 0.6, 15.55]));
+    // silla del jefe en la cabecera
+    add(31.2, box(12.75, 17.9, 0, 0.35, 1.2, 2.7, ['#e7b84a', '#c99a2e', '#b08424']), [12.75, 17.9, 13.1, 19.1]);
+    add(40, box(14.6, 17.2, 0, 6.8, 2.6, 1.25, DARK_WOOD), [14.6, 17.2, 21.4, 19.8]);
+    add(40.1, box(16.0, 17.9, 1.25, 0.8, 0.6, 0.04, ['#fffdf5', '#eee5d2', '#e0d6c0']), [14.6, 17.2, 21.4, 19.8]);
+    add(40.2, box(19.2, 18.2, 1.25, 0.3, 0.3, 0.35, ['#ffffff', '#ececec', '#d9d9d9']), [14.6, 17.2, 21.4, 19.8]);
+    add(43, box(22.3, 19.4, 0, 1.3, 2.4, 1.2, WOOD), [22.3, 19.4, 23.6, 21.8]);
+    add(43.1, box(22.6, 19.8, 1.2, 0.7, 0.7, 0.9, '#3b4252'), [22.3, 19.4, 23.6, 21.8]);
+    add(43.2, box(22.7, 20.9, 1.2, 0.35, 0.35, 0.35, ['#ffffff', '#ececec', '#d9d9d9']), [22.3, 19.4, 23.6, 21.8]);
+    add(25.6, plant(23.0, 13.2), [22.6, 12.8, 23.4, 13.6]);
+    add(35.9, plant(13.2, 23.0), [12.8, 22.6, 13.6, 23.4]);
+  }
+  if (room === 'kike') {
+    add(37.6, plant(13.2, 25.0), [12.8, 24.6, 13.6, 25.4]);
+    add(47.6, plant(23.0, 25.0), [22.6, 24.6, 23.4, 25.4]);
+    add(44.9, box(17.6, 26.4, 0, 1.2, 0.3, 2.8, ['#e7b84a', '#c99a2e', '#b08424']), [17.6, 26.4, 18.8, 26.7]);
+    add(46.0, box(16.4, 28.4, 0, 3.6, 1.5, 1.3, DARK_WOOD), [16.4, 28.4, 20.0, 29.9]);
+    const [px, py] = iso(16.6, 29.92, 0.65);
+    add(
+      46.1,
+      s(
+        'text',
+        { transform: `matrix(0.8944,0.4472,0,1,${px},${py})`, 'font-size': 7.5, 'font-weight': 900, fill: '#ffe08a', 'letter-spacing': 1 },
+        '👑 JEFE'
+      ),
+      [16.4, 28.4, 20.0, 29.9]
+    );
+    add(46.2, s('polygon', { points: P([[16.7, 28.95, 1.38], [18.0, 28.95, 1.38], [18.0, 28.8, 2.3], [16.7, 28.8, 2.3]]), fill: '#3b4252', ...EDGE }), [16.4, 28.4, 20.0, 29.9]);
+    add(46.3, box(19.1, 28.8, 1.3, 0.35, 0.35, 0.4, ['#ffffff', '#ececec', '#d9d9d9']), [16.4, 28.4, 20.0, 29.9]);
+    const [gx, gy] = iso(18.9, 29.5, 1.75);
+    add(46.4, s('circle', { cx: gx, cy: gy, r: 4.2, fill: '#22a6c0', stroke: '#2e7d4f', 'stroke-width': 1.4 }), [16.4, 28.4, 20.0, 29.9]);
+    add(52.0, box(22.4, 29.4, 0, 1.2, 3.4, 0.8, ['#3f8f9a', '#2f7a85', '#256570']), [22.4, 29.4, 23.6, 32.8]);
+    add(52.1, box(23.25, 29.4, 0.8, 0.35, 3.4, 0.9, ['#3f8f9a', '#2f7a85', '#256570']), [22.4, 29.4, 23.6, 32.8]);
   }
   return items;
 }
 
+// Tabiques bajos: [eje, coordenada, desde, hasta]
+const PARTITIONS = [
+  ['x', 12, 0.2, 8],
+  ['x', 12, 10.5, 11.85],
+  ['y', 12, 0.2, 8],
+  ['y', 12, 10.5, 11.85],
+  ['x', 12, 12.15, 13.5],
+  ['x', 12, 16, 23.8],
+  ['y', 12, 12.15, 13.5],
+  ['y', 12, 16, 23.8],
+  ['y', 24, 12.15, 19],
+  ['y', 24, 21.5, 23.8],
+];
+
 function partitions(segments) {
   const g = s('g', { class: 'partitions', 'pointer-events': 'none' });
-  for (const [axis, a, b] of segments) {
-    const node = axis === 'x' ? box(11.85, a, 0, 0.3, b - a, 1.1, ['#d8c29c', '#f6ecd9', '#e6d4b2']) : box(a, 11.85, 0, b - a, 0.3, 1.1, ['#d8c29c', '#f6ecd9', '#e6d4b2']);
-    g.append(node);
+  const colors = ['#d8c29c', '#f6ecd9', '#e6d4b2'];
+  for (const [axis, at, a, b] of segments) {
+    g.append(axis === 'x' ? box(at - 0.15, a, 0, 0.3, b - a, 1.1, colors) : box(a, at - 0.15, 0, b - a, 0.3, 1.1, colors));
   }
   return g;
 }
@@ -327,13 +382,23 @@ export function spriteParts(look, { withLegs = true } = {}) {
       hair(look),
       s(
         'g',
-        { class: 'eyes' },
-        s('ellipse', { cx: -3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' }),
-        s('ellipse', { cx: 3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' })
+        { class: 'face' },
+        s(
+          'g',
+          { class: 'eyes' },
+          s('ellipse', { cx: -3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' }),
+          s('ellipse', { cx: 3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' })
+        ),
+        s('circle', { cx: -5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
+        s('circle', { cx: 5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
+        s('path', { class: 'mouth', d: 'M-2.6 -31 Q0 -28.8 2.6 -31', stroke: '#6b3a2a', 'stroke-width': 1.3, fill: 'none', 'stroke-linecap': 'round' })
       ),
-      s('circle', { cx: -5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
-      s('circle', { cx: 5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
-      s('path', { class: 'mouth', d: 'M-2.6 -31 Q0 -28.8 2.6 -31', stroke: '#6b3a2a', 'stroke-width': 1.3, fill: 'none', 'stroke-linecap': 'round' })
+      // nuca: se ve cuando el personaje está de espaldas
+      s('path', {
+        class: 'back-hair',
+        d: 'M-9.9 -36 C-10.5 -48 10.5 -48 9.9 -36 C9.6 -30 6 -27.2 0 -27.2 C-6 -27.2 -9.6 -30 -9.9 -36 Z',
+        fill: look.hairStyle === 'gorra' ? shade(look.hair || '#1b1b1b', -0.1) : look.hair || '#1b1b1b',
+      })
     )
   );
   return parts;
@@ -407,14 +472,43 @@ function homeOf(id) {
 
 // ---------- Montaje ----------
 
+const LAYER_ORDER = [
+  ['room', 'copy'],
+  ['parts', 0, 4],
+  ['room', 'analista'],
+  ['room', 'guion'],
+  ['parts', 4, 8],
+  ['room', 'juntas'],
+  ['parts', 8, 10],
+  ['room', 'kike'],
+];
+
+function bossChar() {
+  const b = store.boss();
+  const name = `👑 ${(b.name || 'Kike').slice(0, 14)}`;
+  const w = nameWidth(name) + 4;
+  return s(
+    'g',
+    { class: 'agent boss', 'data-boss': '1', 'data-status': 'idle', role: 'img', 'aria-label': `${b.name}, el jefe` },
+    s('ellipse', { class: 'shadow', cx: 0, cy: 0, rx: 11, ry: 4.4, fill: 'rgba(60,35,10,.22)' }),
+    s('g', { class: 'sprite' }, ...spriteParts(b.look)),
+    s(
+      'g',
+      { class: 'nametag', transform: 'translate(0,-58)' },
+      s('rect', { x: -w / 2, y: -8, width: w, height: 15, rx: 7.5, fill: '#e7b84a' }),
+      s('text', { x: 0, y: 3, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 900, fill: '#1d2433' }, name)
+    )
+  );
+}
+
 export function renderOffice(container) {
   const host = container || svgRoot?.parentElement;
   if (!host) return;
   const svg = s('svg', {
     class: 'office-svg',
-    viewBox: '-395 -128 790 552',
+    viewBox: '-395 -128 790 650',
     role: 'img',
-    'aria-label': 'Oficina isométrica de Vacilando Ando con tres agentes y una sala de juntas',
+    'aria-label': 'Oficina isométrica de Vacilando Ando: tres agentes, tu oficina y la sala de juntas',
   });
   svg.append(
     s(
@@ -432,7 +526,7 @@ export function renderOffice(container) {
   svg.append(root);
   root.append(staticScene());
 
-  layers = {};
+  layers = { rooms: {} };
   const roomLayer = (room) => {
     const g = s('g', { class: 'room-layer', 'data-room': room });
     const items = roomItems(room);
@@ -448,38 +542,36 @@ export function renderOffice(container) {
         items.push({ depth: MEET[id][0] + MEET[id][1], node: slot });
       }
     }
-    items.sort((a, b) => a.depth - b.depth).forEach((it) => g.append(it.node));
+    items
+      .sort((a, b) => a.depth - b.depth)
+      .forEach((it) => {
+        it.node.__depth = it.depth;
+        it.node.__bounds = it.b;
+        g.append(it.node);
+      });
+    layers.rooms[room] = g;
     return g;
   };
-
-  root.append(roomLayer('copy'));
-  root.append(
-    partitions([
-      ['x', 0.2, 8],
-      ['x', 10.5, 11.85],
-      ['y', 0.2, 8],
-      ['y', 10.5, 11.85],
-    ])
-  );
-  root.append(roomLayer('analista'), roomLayer('guion'));
-  root.append(
-    partitions([
-      ['x', 12.15, 13.5],
-      ['x', 16, 23.8],
-      ['y', 12.15, 13.5],
-      ['y', 16, 23.8],
-    ])
-  );
-  root.append(roomLayer('juntas'));
+  for (const [kind, a, b] of LAYER_ORDER) {
+    root.append(kind === 'room' ? roomLayer(a) : partitions(PARTITIONS.slice(a, b)));
+  }
   layers.overlay = s('g', { class: 'overlay' });
   root.append(layers.overlay);
 
   // Etiquetas de las salas
   const labels = s('g', { class: 'room-labels' });
   const agents = store.agents();
-  const spots = { copy: iso(0, 0, 8.4), analista: iso(17.5, 0, 7.6), guion: iso(0, 17.5, 7.6), juntas: iso(24, 24, -2.6) };
-  for (const room of ['copy', 'analista', 'guion', 'juntas']) {
-    const text = room === 'juntas' ? '🤝 Sala de juntas' : `${ROLES[room].icon} ${agents[room].name}`;
+  const [kx, ky] = iso(24, 34);
+  const spots = {
+    copy: iso(0, 0, 8.4),
+    analista: iso(17.5, 0, 7.6),
+    guion: iso(0, 17.5, 7.6),
+    juntas: [175, 356],
+    kike: [kx, ky + 30],
+  };
+  for (const room of ['copy', 'analista', 'guion', 'juntas', 'kike']) {
+    const text =
+      room === 'juntas' ? '🤝 Sala de juntas' : room === 'kike' ? `👑 Oficina de ${store.boss().name || 'Kike'}` : `${ROLES[room].icon} ${agents[room].name}`;
     const w = nameWidth(text, 11) + 6;
     const [lx, ly] = spots[room];
     labels.append(
@@ -500,29 +592,40 @@ export function renderOffice(container) {
     place(el, homeOf(id));
     slots[id][runtime.location[id] === 'meeting' ? 'meeting' : 'office'].append(el);
   }
+  boss.el = bossChar();
+  boss.el.classList.toggle('facing-away', boss.facing === 'away');
+  boss.el.classList.toggle('walking', !!boss.path.length);
+  setBossPos(boss.x, boss.y);
 
-  // Interacción
+  // Interacción: tocar un agente o una etiqueta = ir a consultarle; tocar el piso = caminar hasta ahí.
   svg.addEventListener('click', (e) => {
-    const target = e.target.closest('[data-agent], [data-room]');
-    if (!target) return;
-    navigateTo(target.dataset.agent || target.dataset.room);
+    const target = e.target.closest('[data-agent], .room-label');
+    if (target) {
+      visit(target.dataset.agent || target.dataset.room);
+      return;
+    }
+    // Tocar cualquier otro punto de la oficina: el jefe camina hasta ahí.
+    if (e.target.closest('.scene')) {
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const x = (p.x / TW + p.y / TH) / 2;
+      const y = (p.y / TH - p.x / TW) / 2;
+      bossWalkTo([x, y], { face: null, target: null });
+    }
   });
   svg.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const target = e.target.closest('[data-agent], [data-room]');
     if (!target) return;
     e.preventDefault();
-    navigateTo(target.dataset.agent || target.dataset.room);
+    visit(target.dataset.agent || target.dataset.room);
   });
 
   host.replaceChildren(svg);
   svgRoot = svg;
   setActiveRoom(activeRoom);
-}
-
-function navigateTo(key) {
-  if (key === 'juntas') go('#/juntas');
-  else if (AGENT_IDS.includes(key)) go(`#/agente/${key}`);
 }
 
 let activeRoom = null;
@@ -535,6 +638,7 @@ export function setActiveRoom(room) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isSmallScreen = () => window.matchMedia('(max-width: 900px)').matches;
 
 async function walk(id, to) {
   const el = charEls[id];
@@ -572,8 +676,381 @@ export function moveAgent(id, to) {
   return walking[id];
 }
 
+// ---------- Avatar del jefe: caminar por la oficina ----------
+
+const BOSS_SPOTS = {
+  home: { at: [18.2, 27.4], face: 'front' },
+  meeting: { at: [13.75, 18.5], face: 'front' },
+  copy: { at: [6.3, 8.3], face: 'away' },
+  analista: { at: [18.2, 8.3], face: 'away' },
+  guion: { at: [6.3, 20.3], face: 'away' },
+};
+const SPEED = 6.5; // unidades por segundo
+const PAD = 0.32; // "radio" del avatar para no atravesar muebles
+
+// Obstáculos en el piso [x1, y1, x2, y2]: muebles (con los agentes sentados) y tabiques.
+const OBSTACLES = [
+  [0.1, 9.9, 1.0, 11.7],
+  [10.4, 0.9, 11.2, 1.7],
+  [4.6, 3.6, 8.0, 7.1],
+  [12.8, 0.9, 13.6, 1.7],
+  [16.4, 3.6, 20.0, 7.1],
+  [22.4, 8.6, 23.6, 10.2],
+  [1.0, 22.2, 1.8, 23.0],
+  [4.6, 15.6, 8.0, 19.1],
+  [9.0, 20.1, 10.2, 21.1],
+  [15.3, 15.25, 20.7, 16.9],
+  [14.6, 17.2, 21.4, 19.8],
+  [12.75, 17.9, 13.1, 19.1],
+  [22.3, 19.4, 23.6, 21.8],
+  [22.6, 12.8, 23.4, 13.6],
+  [12.8, 22.6, 13.6, 23.4],
+  [12.8, 24.6, 13.6, 25.4],
+  [22.6, 24.6, 23.4, 25.4],
+  [17.6, 26.4, 18.8, 26.7],
+  [16.4, 28.4, 20.0, 29.9],
+  [22.4, 29.4, 23.6, 32.8],
+  ...PARTITIONS.map(([axis, at, a, b]) => (axis === 'x' ? [at - 0.15, a, at + 0.15, b] : [a, at - 0.15, b, at + 0.15])),
+];
+
+const boss = { x: 18.2, y: 27.4, el: null, path: [], target: 'home', facing: 'front', keys: new Set(), raf: 0, last: 0, done: null };
+
+function isFree(x, y) {
+  if (x < 0.6 || x > 23.4 || y < 0.6 || y > 33.4) return false;
+  if (x < 12.4 && y > 23.4) return false;
+  for (const [a, b, c, d] of OBSTACLES) if (x > a - PAD && x < c + PAD && y > b - PAD && y < d + PAD) return false;
+  return true;
+}
+
+function lineFree(a, b) {
+  const steps = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.15);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    if (!isFree(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)) return false;
+  }
+  return true;
+}
+
+const G = 0.5;
+const GW = 49;
+const GH = 69;
+const cellFree = (i, j) => isFree(i * G, j * G);
+
+function nearestFreeCell(x, y) {
+  const ci = Math.round(x / G);
+  const cj = Math.round(y / G);
+  for (let r = 0; r < 12; r++) {
+    let best = null;
+    for (let i = ci - r; i <= ci + r; i++) {
+      for (let j = cj - r; j <= cj + r; j++) {
+        if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r || !cellFree(i, j)) continue;
+        const d = Math.hypot(i * G - x, j * G - y);
+        if (!best || d < best.d) best = { i, j, d };
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** Ruta más corta (A*) por la cuadrícula del piso, luego suavizada. */
+function findPath(from, to) {
+  const start = nearestFreeCell(from[0], from[1]);
+  const goal = nearestFreeCell(to[0], to[1]);
+  if (!start || !goal) return null;
+  const key = (i, j) => j * GW + i;
+  const gScore = new Map([[key(start.i, start.j), 0]]);
+  const came = new Map();
+  const h = (i, j) => {
+    const dx = Math.abs(i - goal.i);
+    const dy = Math.abs(j - goal.j);
+    return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+  };
+  const open = [[h(start.i, start.j), start.i, start.j]];
+  const closed = new Set();
+  const push = (n) => {
+    open.push(n);
+    let k = open.length - 1;
+    while (k > 0) {
+      const p = (k - 1) >> 1;
+      if (open[p][0] <= open[k][0]) break;
+      [open[p], open[k]] = [open[k], open[p]];
+      k = p;
+    }
+  };
+  const pop = () => {
+    const top = open[0];
+    const last = open.pop();
+    if (open.length) {
+      open[0] = last;
+      let k = 0;
+      for (;;) {
+        const l = 2 * k + 1;
+        const r = l + 1;
+        let m = k;
+        if (l < open.length && open[l][0] < open[m][0]) m = l;
+        if (r < open.length && open[r][0] < open[m][0]) m = r;
+        if (m === k) break;
+        [open[m], open[k]] = [open[k], open[m]];
+        k = m;
+      }
+    }
+    return top;
+  };
+  let found = false;
+  while (open.length) {
+    const [, i, j] = pop();
+    const k = key(i, j);
+    if (closed.has(k)) continue;
+    closed.add(k);
+    if (i === goal.i && j === goal.j) {
+      found = true;
+      break;
+    }
+    for (let di = -1; di <= 1; di++) {
+      for (let dj = -1; dj <= 1; dj++) {
+        if (!di && !dj) continue;
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= GW || nj >= GH || !cellFree(ni, nj)) continue;
+        if (di && dj && (!cellFree(i + di, j) || !cellFree(i, j + dj))) continue;
+        const nk = key(ni, nj);
+        const g = gScore.get(k) + (di && dj ? Math.SQRT2 : 1);
+        if (g < (gScore.get(nk) ?? Infinity)) {
+          gScore.set(nk, g);
+          came.set(nk, k);
+          push([g + h(ni, nj), ni, nj]);
+        }
+      }
+    }
+  }
+  if (!found) return null;
+  const cells = [];
+  for (let k = key(goal.i, goal.j); k !== undefined; k = came.get(k)) cells.unshift([(k % GW) * G, Math.floor(k / GW) * G]);
+  const end = isFree(to[0], to[1]) ? to : cells[cells.length - 1];
+  const raw = [from, ...cells.slice(1, -1), end];
+  // Suavizado: saltar directo al punto visible más lejano.
+  const out = [raw[0]];
+  let i = 0;
+  while (i < raw.length - 1) {
+    let j = raw.length - 1;
+    while (j > i + 1 && !lineFree(raw[i], raw[j])) j--;
+    out.push(raw[j]);
+    i = j;
+  }
+  return out;
+}
+
+function roomAt(x, y) {
+  if (y >= 24) return 'kike';
+  if (y < 12) return x < 12 ? 'copy' : 'analista';
+  return x < 12 ? 'guion' : 'juntas';
+}
+
+function isBehind(node, x, y) {
+  const b = node.__bounds;
+  if (b) return b[2] <= x + 0.05 || b[3] <= y + 0.05;
+  return node.__depth != null && node.__depth <= x + y;
+}
+
+/** Coloca al jefe en la capa de su sala, delante de lo que tiene detrás. */
+function relayerBoss() {
+  if (!layers?.rooms || !boss.el) return;
+  const layer = layers.rooms[roomAt(boss.x, boss.y)];
+  const kids = [...layer.children].filter((n) => n !== boss.el);
+  let lastBehind = -1;
+  kids.forEach((n, i) => {
+    if (isBehind(n, boss.x, boss.y)) lastBehind = i;
+  });
+  const ref = kids[lastBehind + 1] || null;
+  if (boss.el.parentNode === layer && boss.el.nextSibling === ref) return;
+  layer.insertBefore(boss.el, ref);
+}
+
+function setBossPos(x, y) {
+  boss.x = x;
+  boss.y = y;
+  if (!boss.el) return;
+  const [px, py] = iso(x, y);
+  boss.el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
+  relayerBoss();
+}
+
+function setFacing(face) {
+  if (!face || face === boss.facing) return;
+  boss.facing = face;
+  boss.el?.classList.toggle('facing-away', face === 'away');
+}
+
+function finishPath(arrived) {
+  boss.path = [];
+  boss.el?.classList.remove('walking');
+  const done = boss.done;
+  boss.done = null;
+  done?.(arrived);
+}
+
+function tick(ts) {
+  const dt = boss.last ? Math.min(0.05, (ts - boss.last) / 1000) : 0;
+  boss.last = ts;
+  let moving = false;
+
+  if (boss.keys.size) {
+    let dx = 0;
+    let dy = 0;
+    for (const k of boss.keys) {
+      if (k === 'up') (dx -= 1), (dy -= 1);
+      if (k === 'down') (dx += 1), (dy += 1);
+      if (k === 'left') (dx -= 1), (dy += 1);
+      if (k === 'right') (dx += 1), (dy -= 1);
+    }
+    const len = Math.hypot(dx, dy);
+    if (len) {
+      const vx = (dx / len) * SPEED * dt;
+      const vy = (dy / len) * SPEED * dt;
+      const nx = boss.x + vx;
+      const ny = boss.y + vy;
+      if (isFree(nx, ny)) setBossPos(nx, ny);
+      else if (isFree(nx, boss.y)) setBossPos(nx, boss.y);
+      else if (isFree(boss.x, ny)) setBossPos(boss.x, ny);
+      setFacing(dx + dy < 0 ? 'away' : dx + dy > 0 ? 'front' : null);
+      boss.el?.classList.add('walking');
+      moving = true;
+    }
+  } else if (boss.path.length) {
+    let budget = SPEED * dt;
+    while (budget > 0 && boss.path.length) {
+      const [tx, ty] = boss.path[0];
+      const dx = tx - boss.x;
+      const dy = ty - boss.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= budget) {
+        setBossPos(tx, ty);
+        boss.path.shift();
+        budget -= d;
+      } else {
+        setBossPos(boss.x + (dx / d) * budget, boss.y + (dy / d) * budget);
+        setFacing(dx + dy < -0.01 ? 'away' : dx + dy > 0.01 ? 'front' : null);
+        budget = 0;
+      }
+    }
+    moving = true;
+    if (!boss.path.length) {
+      setFacing(boss.arriveFace);
+      finishPath(true);
+    }
+  } else {
+    boss.el?.classList.remove('walking');
+  }
+
+  if (moving || boss.keys.size) boss.raf = requestAnimationFrame(tick);
+  else {
+    boss.raf = 0;
+    boss.last = 0;
+  }
+}
+
+function startLoop() {
+  if (!boss.raf) {
+    boss.last = 0;
+    boss.raf = requestAnimationFrame(tick);
+  }
+}
+
+/** Camina hasta un punto [x, y]. Devuelve una promesa: true si llegó, false si lo interrumpieron. */
+function bossWalkTo(point, { face = null, target = null } = {}) {
+  if (boss.done) finishPath(false);
+  boss.target = target;
+  const path = findPath([boss.x, boss.y], point);
+  if (!path || path.length < 2) {
+    setFacing(face);
+    return Promise.resolve(!!path);
+  }
+  boss.arriveFace = face;
+  if (reduceMotion()) {
+    const end = path[path.length - 1];
+    setBossPos(end[0], end[1]);
+    setFacing(face);
+    return Promise.resolve(true);
+  }
+  boss.path = path.slice(1);
+  boss.el?.classList.add('walking');
+  boss.promise = new Promise((resolve) => {
+    boss.done = resolve;
+    startLoop();
+  });
+  return boss.promise;
+}
+
+/** Lleva al jefe a un lugar conocido: 'home', 'meeting' o el id de un agente. */
+export function bossGoTo(where) {
+  const spot = BOSS_SPOTS[where];
+  if (!spot) return Promise.resolve(false);
+  const [x, y] = spot.at;
+  if (boss.target === where && (boss.path.length || Math.hypot(boss.x - x, boss.y - y) < 0.3)) {
+    return boss.done ? boss.promise : Promise.resolve(true);
+  }
+  return bossWalkTo(spot.at, { face: spot.face, target: where });
+}
+
+/** Coloca al jefe sin animación (al abrir la app directo en una sección). */
+export function bossPlace(where) {
+  const spot = BOSS_SPOTS[where];
+  if (!spot) return;
+  if (boss.done) finishPath(false);
+  boss.target = where;
+  setBossPos(spot.at[0], spot.at[1]);
+  setFacing(spot.face);
+}
+
+/** Tocar un agente o una sala: el jefe camina hasta ahí y se abre la consulta. */
+export async function visit(key) {
+  if (key === 'kike') {
+    bossGoTo('home');
+    return;
+  }
+  const hash = key === 'juntas' ? '#/juntas' : AGENT_IDS.includes(key) ? `#/agente/${key}` : null;
+  if (!hash) return;
+  const where = key === 'juntas' ? 'meeting' : key;
+  if (isSmallScreen()) {
+    // En el teléfono el panel tapa la oficina: primero camina, luego abre.
+    const arrived = await bossGoTo(where);
+    if (arrived) go(hash);
+  } else {
+    bossGoTo(where);
+    go(hash);
+  }
+}
+
+const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+
+function typingTarget(el) {
+  return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+}
+
+function bindKeys() {
+  window.addEventListener('keydown', (e) => {
+    const dir = KEYMAP[e.code];
+    if (!dir || e.altKey || e.ctrlKey || e.metaKey || typingTarget(e.target) || document.querySelector('dialog[open]')) return;
+    // Solo cuando el foco no está dentro del panel (para no robarle el scroll).
+    if (document.activeElement && document.activeElement !== document.body && !document.activeElement.closest('.stage')) return;
+    if (!document.querySelector('.office-svg')?.getClientRects().length) return;
+    e.preventDefault();
+    if (boss.done) finishPath(false);
+    boss.target = null;
+    boss.keys.add(dir);
+    startLoop();
+  });
+  window.addEventListener('keyup', (e) => {
+    const dir = KEYMAP[e.code];
+    if (dir) boss.keys.delete(dir);
+  });
+  window.addEventListener('blur', () => boss.keys.clear());
+}
+
 export function mountOffice(container) {
   renderOffice(container);
+  bindKeys();
   on('status', ({ id }) => charEls[id] && updateBubble(charEls[id], id));
   on('agents-changed', () => renderOffice());
 }

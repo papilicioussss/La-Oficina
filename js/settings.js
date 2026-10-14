@@ -6,6 +6,7 @@ import { AGENT_IDS, DEFAULT_SOURCES } from './store.js';
 import { runtime, emit, go } from './state.js';
 import { listModels } from './gemini.js';
 import { tavilySearch, SearchUnavailable } from './search.js';
+import { listGroqModels } from './groq.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
 
@@ -39,6 +40,10 @@ const saveAgents = debounce(() => {
   emit('agents-changed');
 }, 450);
 const saveBrief = debounce(() => store.save('brief'), 400);
+const saveBoss = debounce(() => {
+  store.save('boss');
+  emit('agents-changed');
+}, 450);
 
 function field(label, control, hint) {
   return h('div', { class: 'field' }, h('label', null, label), control, hint ? h('span', { class: 'hint' }, hint) : null);
@@ -253,9 +258,119 @@ function keysTab() {
           'Solo si Tavily no conecta directo desde el navegador. En el README está el paso a paso para crear uno gratis en Cloudflare.'
         )
       )
-    )
+    ),
+    groqSection(s)
   );
   return wrap;
+}
+
+function groqModelSelect(current, onChange) {
+  const s = store.settings();
+  const known = s.groqKnownModels?.length
+    ? s.groqKnownModels
+    : [
+        { id: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile' },
+        { id: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant' },
+      ];
+  const list = [...known];
+  if (current && !list.some((m) => m.id === current)) list.unshift({ id: current, label: current });
+  const sel = h('select', { onChange: (e) => onChange(e.target.value) }, list.map((m) => h('option', { value: m.id }, m.id)));
+  sel.value = current;
+  return sel;
+}
+
+function groqSection(s) {
+  const box = h('div');
+  const status = h('span', { class: 'hint' });
+  const k = secretInput(s.groqKey, (v) => {
+    s.groqKey = v;
+    runtime.groqBlocked = false;
+    runtime.groqWarned = false;
+    saveSettings();
+  }, 'gsk_…');
+  const test = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, 'Probar');
+  const models = h('div');
+  const renderModels = () =>
+    models.replaceChildren(
+      field(
+        'Modelo de Groq',
+        groqModelSelect(s.groqModel, (v) => {
+          s.groqModel = v;
+          saveSettings();
+        }),
+        'Para las reuniones y el respaldo. Recomendado: llama-3.3-70b-versatile (buen español) o uno de 70B+ que aparezca en tu lista.'
+      ),
+      field(
+        'Modelo rápido de Groq',
+        groqModelSelect(s.groqFastModel, (v) => {
+          s.groqFastModel = v;
+          saveSettings();
+        }),
+        'Para preparar las búsquedas de la sala de juntas (tarea pequeña).'
+      )
+    );
+  renderModels();
+  test.addEventListener('click', async () => {
+    store.save('settings');
+    if (!s.groqKey) {
+      status.className = 'err-text';
+      status.textContent = 'Pega tu key primero.';
+      return;
+    }
+    test.disabled = true;
+    status.className = 'hint';
+    status.textContent = 'Probando…';
+    try {
+      const list = await listGroqModels(s.groqKey);
+      s.groqKnownModels = list;
+      runtime.groqBlocked = false;
+      store.save('settings');
+      renderModels();
+      status.className = 'ok-text';
+      status.textContent = `✔ Conectado. ${list.length} modelos disponibles.`;
+      if (list.length && !list.some((m) => m.id === s.groqModel)) toast(`Ojo: "${s.groqModel}" ya no está en Groq. Elige otro modelo.`, 'warn', 7000);
+    } catch (e) {
+      status.className = 'err-text';
+      status.textContent = '✖ ' + e.message;
+    } finally {
+      test.disabled = false;
+    }
+  });
+  const check = (key, label) =>
+    h(
+      'div',
+      { class: 'field' },
+      h(
+        'label',
+        { class: 'check' },
+        h('input', {
+          type: 'checkbox',
+          checked: s[key],
+          onChange: (e) => {
+            s[key] = e.target.checked;
+            saveSettings();
+          },
+        }),
+        label
+      )
+    );
+  box.append(
+    h('div', { class: 'section-title' }, 'Groq · opcional (velocidad y respaldo)'),
+    h(
+      'p',
+      { class: 'note' },
+      '⚡ Groq responde rapidísimo y tiene plan gratis aparte. Lo uso donde más rinde: en los turnos de la sala de juntas (muchas llamadas seguidas, así ahorras cuota de Gemini) y como respaldo automático cuando Gemini llega a su límite. Gemini sigue a cargo de lo que Groq no hace igual de bien: leer capturas y buscar con Google.'
+    ),
+    field(
+      'API key de Groq',
+      h('div', { class: 'key-row' }, k.input, k.eye, test),
+      h('span', null, 'Sácala gratis en ', h('a', { href: 'https://console.groq.com/keys', target: '_blank', rel: 'noopener noreferrer' }, 'console.groq.com/keys'), '. ', status)
+    ),
+    models,
+    check('groqMeetings', 'Usar Groq en los turnos de la sala de juntas'),
+    check('groqFallback', 'Usar Groq como respaldo cuando Gemini llegue al límite')
+  );
+  return box;
 }
 
 // ---------------- Equipo ----------------
@@ -281,6 +396,56 @@ function swatches(colors, current, onPick) {
   return box;
 }
 
+function bossCard() {
+  const b = store.boss();
+  const preview = h('div', { class: 'avatar-lg' }, avatarSvg(b.look, 'avatar-lg'));
+  const refresh = () => {
+    preview.replaceChildren(avatarSvg(b.look, 'avatar-lg'));
+    saveBoss();
+  };
+  const hairStyle = h(
+    'select',
+    {
+      onChange: (e) => {
+        b.look.hairStyle = e.target.value;
+        refresh();
+      },
+    },
+    HAIR_STYLES.map(([v, l]) => h('option', { value: v }, l))
+  );
+  hairStyle.value = b.look.hairStyle;
+  return h(
+    'section',
+    { class: 'team-card team-card-boss' },
+    h(
+      'div',
+      { class: 'team-card-head' },
+      preview,
+      h('div', null, h('strong', null, '👑 Tú, el jefe'), h('div', { class: 'hint' }, 'Tu avatar en la oficina: camina hasta los agentes y dirige las reuniones.'))
+    ),
+    field(
+      'Tu nombre',
+      h('input', {
+        type: 'text',
+        value: b.name,
+        maxlength: 20,
+        onInput: (e) => {
+          b.name = e.target.value.trim() || 'Kike';
+          saveBoss();
+        },
+      })
+    ),
+    h(
+      'div',
+      { class: 'form-grid' },
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Camisa'), swatches([...SHIRTS, '#1d2433', '#e7b84a'], b.look.shirt, (c) => ((b.look.shirt = c), refresh()))),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Tono de piel'), swatches(SKINS, b.look.skin, (c) => ((b.look.skin = c), refresh()))),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Peinado'), hairStyle),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Color de pelo / gorra'), swatches(HAIRS, b.look.hair, (c) => ((b.look.hair = c), refresh())))
+    )
+  );
+}
+
 function teamTab() {
   const agents = store.agents();
   const wrap = h('div');
@@ -291,6 +456,7 @@ function teamTab() {
       '¡Bautiza a tu equipo! Ponles nombre, personalidad y estilo. La personalidad cambia cómo te hablan; las indicaciones extra son reglas fijas que siempre van a seguir.'
     )
   );
+  wrap.append(bossCard());
   for (const id of AGENT_IDS) {
     const a = agents[id];
     const role = ROLES[id];
@@ -558,5 +724,6 @@ export function renderSettings(panel, tab = 'claves') {
     store.save('settings');
     store.save('brief');
     store.save('agents');
+    store.save('boss');
   };
 }

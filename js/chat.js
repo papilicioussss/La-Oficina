@@ -82,7 +82,15 @@ function msgEl(agentId, m) {
   }
   const a = store.agents()[agentId];
   const el = h('div', { class: `msg msg-model${m.error ? ' msg-error' : ''}`, 'data-id': m.id });
-  el.append(h('div', { class: 'msg-head' }, avatarSvg(a.look), a.name));
+  el.append(
+    h(
+      'div',
+      { class: 'msg-head' },
+      avatarSvg(a.look),
+      a.name,
+      m.via === 'groq' ? h('span', { class: 'via-badge', title: 'Gemini llegó al límite: respondió Groq (sin búsqueda web)' }, '⚡ Groq') : null
+    )
+  );
   if (m.pending && m.status) el.append(h('div', { class: 'msg-status' }, m.status));
   if (m.text) el.append(h('div', { class: 'md', html: md(m.text) }));
   else if (m.pending) el.append(typing());

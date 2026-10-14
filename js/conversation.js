@@ -67,6 +67,7 @@ export async function sendToAgent(agentId, text, images = []) {
     });
     reply.text = res.text;
     reply.sources = res.sources;
+    if (res.via) reply.via = res.via;
     if (!reply.text.trim()) reply.error = 'No llegó respuesta. Intenta de nuevo.';
   } catch (e) {
     if (e.name === 'AbortError') {

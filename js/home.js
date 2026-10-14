@@ -60,7 +60,8 @@ export function renderHome(panel) {
   renderCards();
 
   const hour = new Date().getHours();
-  const saludo = hour < 12 ? '¡Buenos días, Kike!' : hour < 19 ? '¡Epa, Kike!' : '¡Buenas noches, Kike!';
+  const name = store.boss().name || 'Kike';
+  const saludo = hour < 12 ? `¡Buenos días, ${name}!` : hour < 19 ? `¡Epa, ${name}!` : `¡Buenas noches, ${name}!`;
 
   panel.replaceChildren(
     h(

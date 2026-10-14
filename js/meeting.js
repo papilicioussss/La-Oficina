@@ -6,8 +6,8 @@ import { AGENT_IDS } from './store.js';
 import { runtime, on, emit, go, setStatus } from './state.js';
 import { research, meetingTurn, meetingPlan, searchProvider } from './brain.js';
 import { md, toPlain } from './markdown.js';
-import { ROLES, agentName } from './prompts.js';
-import { avatarSvg, moveAgent } from './office.js';
+import { ROLES, agentName, bossName } from './prompts.js';
+import { avatarSvg, moveAgent, bossGoTo } from './office.js';
 import { sourcesEl } from './chat.js';
 
 const ORDER = ['analista', 'guion', 'copy'];
@@ -58,12 +58,13 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
 
   try {
     // Los agentes caminan a la sala mientras arranca la investigación.
-    const arrival = Promise.all(
-      m.participants.map((id) => {
+    const arrival = Promise.all([
+      bossGoTo('meeting'),
+      ...m.participants.map((id) => {
         setStatus(id, runtime.aborters[id] ? runtime.status[id] : 'meeting');
         return moveAgent(id, 'meeting');
-      })
-    );
+      }),
+    ]);
 
     if (kikeText) {
       m.turns.push({ id: uid(), speaker: 'kike', text: kikeText });
@@ -110,7 +111,7 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
       m.planPending = true;
       changed(m, { type: 'append' });
       try {
-        m.plan = await meetingPlan({
+        const res = await meetingPlan({
           meeting: m,
           signal,
           onText: (txt) => {
@@ -118,6 +119,8 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
             changed(m, { type: 'plan' });
           },
         });
+        m.plan = res.text;
+        m.planVia = res.via;
       } finally {
         m.planPending = false;
         setStatus(mod, 'meeting');
@@ -130,7 +133,7 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
         setStatus(id, 'talking');
         changed(m, { type: 'append' });
         try {
-          t.text = await meetingTurn({
+          const res = await meetingTurn({
             meeting: m,
             agentId: id,
             signal,
@@ -139,6 +142,8 @@ async function runSession(m, { doResearch = false, focus = '', kikeText = '', pl
               changed(m, { type: 'turn', turn: t.id });
             },
           });
+          t.text = res.text;
+          t.via = res.via;
           if (!t.text.trim()) t.error = 'No respondió. Intenta otra ronda.';
         } catch (e) {
           if (e.name !== 'AbortError') t.error = e.message;
@@ -173,6 +178,7 @@ function endMeeting(m) {
       moveAgent(id, 'office').then(() => setStatus(id, runtime.aborters[id] ? runtime.status[id] : 'idle'));
     }
   }
+  bossGoTo('home');
   changed(m, { type: 'append' });
 }
 
@@ -346,7 +352,14 @@ function renderSetup(panel) {
 
 function turnEl(m, t) {
   const agents = store.agents();
-  if (t.speaker === 'kike') return h('div', { class: 'turn turn-kike', 'data-turn': t.id }, h('div', { class: 'turn-head' }, '🙋 Kike'), t.text);
+  if (t.speaker === 'kike') {
+    return h(
+      'div',
+      { class: 'turn turn-kike', 'data-turn': t.id },
+      h('div', { class: 'turn-head' }, avatarSvg(store.boss().look), `👑 ${bossName()}`, h('small', null, 'Jefe')),
+      t.text
+    );
+  }
   if (t.speaker === 'research') {
     const el = h('div', { class: 'turn turn-research', 'data-turn': t.id });
     el.append(h('div', { class: 'turn-head' }, '📚 Investigación web', t.focus ? h('small', null, `· ${t.focus.slice(0, 60)}`) : null));
@@ -361,11 +374,15 @@ function turnEl(m, t) {
   }
   const a = agents[t.speaker];
   const el = h('div', { class: `turn${t.error ? ' msg-error' : ''}`, 'data-turn': t.id });
-  el.append(h('div', { class: 'turn-head' }, avatarSvg(a.look), a.name, h('small', null, ROLES[t.speaker].title)));
+  el.append(h('div', { class: 'turn-head' }, avatarSvg(a.look), a.name, h('small', null, ROLES[t.speaker].title), viaBadge(t.via)));
   if (t.text) el.append(h('div', { class: 'md', html: md(t.text) }));
   else if (t.pending) el.append(h('div', { class: 'typing' }, h('i'), h('i'), h('i')));
   if (t.error) el.append(h('p', null, '⚠️ ', t.error));
   return el;
+}
+
+function viaBadge(via) {
+  return via === 'groq' ? h('span', { class: 'via-badge', title: 'Esta respuesta la generó Groq' }, '⚡ Groq') : null;
 }
 
 function planEl(m) {
@@ -373,7 +390,7 @@ function planEl(m) {
   return h(
     'div',
     { class: 'turn turn-plan', 'data-plan': '1' },
-    h('div', { class: 'turn-head' }, '📋 Plan de contenido'),
+    h('div', { class: 'turn-head' }, '📋 Plan de contenido', viaBadge(m.planVia)),
     m.plan ? h('div', { class: 'md', html: md(m.plan) }) : h('div', { class: 'typing' }, h('i'), h('i'), h('i')),
     !m.planPending && m.plan
       ? h(
@@ -478,7 +495,7 @@ function renderMeeting(panel, m) {
     const provider = searchProvider();
     const ta = h('textarea', {
       rows: 2,
-      placeholder: 'Tu aporte o pregunta, Kike (opcional)…',
+      placeholder: `Tu aporte o instrucción como jefe, ${bossName()} (opcional)…`,
       value: kikeDraft,
       onInput: (e) => (kikeDraft = e.target.value),
     });

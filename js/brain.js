@@ -1,9 +1,10 @@
 // "Cerebro" de los agentes: arma las llamadas a Gemini, la búsqueda web y las reuniones.
 
 import * as store from './store.js';
-import { generate, generateJSON } from './gemini.js';
+import { generate, generateJSON, ApiError } from './gemini.js';
+import { groqChat, groqJSON, GroqError } from './groq.js';
 import { tavilySearch, toTimeRange, SearchUnavailable, SearchError } from './search.js';
-import { buildSystemPrompt, SEARCH_TOOL, ROLES, agentName, today } from './prompts.js';
+import { buildSystemPrompt, SEARCH_TOOL, ROLES, agentName, bossName, today } from './prompts.js';
 import { runtime } from './state.js';
 import { toast } from './ui.js';
 
@@ -21,6 +22,27 @@ export function searchProvider() {
   if (!s.webSearch) return null;
   if (s.searchProvider === 'tavily' && (s.tavilyKey || s.tavilyProxy) && !runtime.tavilyBlocked) return 'tavily';
   return 'google';
+}
+
+// ---------------- Groq ----------------
+
+/** Groq está configurado y no ha fallado por bloqueo del navegador en esta sesión. */
+export function groqReady() {
+  const s = store.settings();
+  return !!s.groqKey && !runtime.groqBlocked;
+}
+
+/** Errores de Gemini que justifican pasarse a Groq: límite, saturación o sin conexión. */
+function geminiDown(e) {
+  return e instanceof ApiError && (e.status === 429 || e.status >= 500 || e.status === 0);
+}
+
+function noteGroqFailure(e) {
+  if (e instanceof GroqError && e.status === 0) runtime.groqBlocked = true;
+  if (!runtime.groqWarned) {
+    runtime.groqWarned = true;
+    toast(`Groq falló (${e.message}). Sigo con Gemini.`, 'warn', 7000);
+  }
 }
 
 function addSource(list, src) {
@@ -131,14 +153,34 @@ export async function runAgent({ agentId, history, text, images = [], onText, on
 
   const provider = searchProvider();
   try {
-    return await attempt(provider);
-  } catch (e) {
-    if (e instanceof SearchUnavailable) {
+    try {
+      return await attempt(provider);
+    } catch (e) {
+      if (!(e instanceof SearchUnavailable)) throw e;
       blockTavily(e);
       onText?.('');
-      return attempt('google');
+      return await attempt('google');
     }
-    throw e;
+  } catch (e) {
+    // Respaldo: si Gemini llegó al límite o está caído, responde Groq (sin búsqueda ni imágenes).
+    if (!geminiDown(e) || !s.groqFallback || !groqReady() || images.length) throw e;
+    onStatus?.('thinking');
+    onText?.('');
+    try {
+      const reply = await groqChat({
+        apiKey: s.groqKey,
+        model: s.groqModel,
+        system: buildSystemPrompt(agentId, { searchAvailable: false }),
+        messages: contents.map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
+        signal,
+        onText,
+      });
+      return { text: reply, sources: [], via: 'groq' };
+    } catch (g) {
+      if (g.name === 'AbortError') throw g;
+      noteGroqFailure(g);
+      throw e;
+    }
   }
 }
 
@@ -159,7 +201,7 @@ function transcript(m) {
     if (t.speaker === 'research') {
       out.push(`[INVESTIGACIÓN WEB${t.focus ? ` sobre "${t.focus}"` : ''}]\n${t.digest}`);
     } else if (t.speaker === 'kike') {
-      out.push(`[Kike]: ${t.text}`);
+      out.push(`[${bossName()} – jefe]: ${t.text}`);
     } else {
       out.push(`[${agentName(t.speaker)} – ${ROLES[t.speaker].title}]: ${t.text}`);
     }
@@ -171,12 +213,27 @@ function transcript(m) {
 export async function research({ meeting, focus, signal, onStatus }) {
   const s = requireKey();
   const provider = searchProvider() || 'google';
-  const about = focus ? `${meetingBrief(meeting)}\nPREGUNTA NUEVA DE KIKE: ${focus}` : meetingBrief(meeting);
+  const about = focus ? `${meetingBrief(meeting)}\nPREGUNTA NUEVA DE ${bossName().toUpperCase()} (EL JEFE): ${focus}` : meetingBrief(meeting);
 
   if (provider === 'tavily') {
     onStatus?.('Preparando las búsquedas…');
     let queries;
-    try {
+    const queryPrompt = `Hoy es ${today()}. Genera 3 consultas de búsqueda web para investigar las estrategias de contenido más recientes útiles para esta necesidad de una agencia de turismo nacional en Venezuela que vende por Instagram, TikTok y WhatsApp:\n\n${about}\n\nConsulta 1: en español, sobre turismo/viajes en Venezuela o Latinoamérica en redes. Consulta 2: en inglés, sobre tendencias recientes de TikTok/Instagram para travel o tourism. Consulta 3: sobre mejores prácticas o cambios de algoritmo recientes aplicables al formato. Sé concreto.`;
+    if (groqReady()) {
+      try {
+        const j = await groqJSON({
+          apiKey: s.groqKey,
+          model: s.groqFastModel || s.groqModel,
+          prompt: `${queryPrompt}\n\nResponde solo con JSON: {"queries": ["...", "...", "..."]}`,
+          signal,
+        });
+        queries = (j.queries || []).filter((q) => typeof q === 'string' && q.trim()).slice(0, 3);
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        noteGroqFailure(e);
+      }
+    }
+    if (!queries?.length) try {
       const j = await generateJSON({
         apiKey: s.geminiKey,
         model: s.fastModel || s.model,
@@ -185,7 +242,7 @@ export async function research({ meeting, focus, signal, onStatus }) {
             role: 'user',
             parts: [
               {
-                text: `Hoy es ${today()}. Genera 3 consultas de búsqueda web para investigar las estrategias de contenido más recientes útiles para esta necesidad de una agencia de turismo nacional en Venezuela que vende por Instagram, TikTok y WhatsApp:\n\n${about}\n\nConsulta 1: en español, sobre turismo/viajes en Venezuela o Latinoamérica en redes. Consulta 2: en inglés, sobre tendencias recientes de TikTok/Instagram para travel o tourism. Consulta 3: sobre mejores prácticas o cambios de algoritmo recientes aplicables al formato. Sé concreto.`,
+                text: queryPrompt,
               },
             ],
           },
@@ -198,7 +255,7 @@ export async function research({ meeting, focus, signal, onStatus }) {
       if (e.name === 'AbortError') throw e;
       queries = []; // si el modelo rápido falla, usamos consultas básicas
     }
-    if (!queries.length) {
+    if (!queries?.length) {
       queries = [
         `${meeting.topic} ${meeting.destination || ''} contenido redes sociales turismo Venezuela`.trim(),
         `travel tourism ${meeting.format || 'reels tiktok'} content trends`,
@@ -251,40 +308,68 @@ export async function research({ meeting, focus, signal, onStatus }) {
   return { queries: [], sources, digest: res.text, provider: 'google' };
 }
 
-/** Turno de un agente en la sala de juntas. */
+/**
+ * Turno de un agente en la sala de juntas. Usa Groq si está activado (rápido y ahorra cuota de
+ * Gemini) y cae en Gemini si Groq falla, o al revés si Gemini llegó al límite.
+ * Devuelve { text, via }.
+ */
 export async function meetingTurn({ meeting, agentId, onText, signal }) {
   const s = requireKey();
   const system =
     buildSystemPrompt(agentId, { meeting: true }) +
     `\n\n## Estás en la SALA DE JUNTAS
-Estás reunido con Kike y tus compañeros para crear contenido. Habla en primera persona como en una reunión real: breve (máximo unas 170 palabras), sin repetir lo que ya se dijo. Construye sobre las ideas de los demás o discrepa con argumentos. Apóyate en la investigación cuando aplique y menciona la fuente entre paréntesis. Termina con una propuesta concreta desde tu área. No armes el plan completo: eso se hace al cierre.`;
+Estás reunido con ${bossName()} (tu jefe, que dirige la reunión) y tus compañeros para crear contenido. Si ${bossName()} aportó algo, tómalo en cuenta primero. Habla en primera persona como en una reunión real: breve (máximo unas 170 palabras), sin repetir lo que ya se dijo. Construye sobre las ideas de los demás o discrepa con argumentos. Apóyate en la investigación cuando aplique y menciona la fuente entre paréntesis. Termina con una propuesta concreta desde tu área. No armes el plan completo: eso se hace al cierre.`;
   const user = `${meetingBrief(meeting)}
 
 TRANSCRIPCIÓN HASTA AHORA:
 ${transcript(meeting) || '(Eres el primero en hablar.)'}
 
 Tu turno, ${agentName(agentId)}. Aporta desde tu área: ${ROLES[agentId].meetingFocus}`;
-  const res = await generate({
-    apiKey: s.geminiKey,
-    model: s.model,
-    system,
-    contents: [{ role: 'user', parts: [{ text: user }] }],
-    signal,
-    onText,
-  });
-  return res.text;
+  return dualGenerate({ system, user, signal, onText, preferGroq: s.groqMeetings });
+}
+
+/** Genera texto con Groq o Gemini según preferencia, usando el otro como respaldo. */
+async function dualGenerate({ system, user, signal, onText, preferGroq }) {
+  const s = store.settings();
+  const viaGroq = () =>
+    groqChat({ apiKey: s.groqKey, model: s.groqModel, system, messages: [{ role: 'user', content: user }], signal, onText }).then((text) => ({
+      text,
+      via: 'groq',
+    }));
+  const viaGemini = () =>
+    generate({ apiKey: s.geminiKey, model: s.model, system, contents: [{ role: 'user', parts: [{ text: user }] }], signal, onText }).then((r) => ({
+      text: r.text,
+      via: 'gemini',
+    }));
+  if (preferGroq && groqReady()) {
+    try {
+      return await viaGroq();
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      noteGroqFailure(e);
+      onText?.('');
+      return viaGemini();
+    }
+  }
+  try {
+    return await viaGemini();
+  } catch (e) {
+    if (!geminiDown(e) || !s.groqFallback || !groqReady()) throw e;
+    onText?.('');
+    return viaGroq();
+  }
 }
 
 /** Cierre de la reunión: plan de contenido final. */
 export async function meetingPlan({ meeting, onText, signal }) {
-  const s = requireKey();
+  requireKey();
   const system =
     buildSystemPrompt('guion', { meeting: true }) +
     '\n\n## Ahora moderas el cierre de la reunión\nTu trabajo es convertir la conversación en un plan claro, accionable y listo para grabar y publicar. Respeta las ideas acordadas y resuelve contradicciones eligiendo la opción con mejor argumento.';
   const names = meeting.participants.map((id) => `${agentName(id)} (${ROLES[id].title})`).join(', ');
   const user = `${meetingBrief(meeting)}
 
-PARTICIPANTES: Kike, ${names}.
+PARTICIPANTES: ${bossName()} (jefe), ${names}.
 
 TRANSCRIPCIÓN COMPLETA:
 ${transcript(meeting)}
@@ -298,16 +383,8 @@ Redacta el PLAN DE CONTENIDO final con estas secciones (Markdown):
 ## Hashtags y palabras clave
 ## Cuándo y dónde publicar (Instagram / TikTok)
 ## Cómo lo vamos a medir (qué métrica y qué número nos diría que funcionó)
-## Pendientes para Kike (lista corta)`;
-  const res = await generate({
-    apiKey: s.geminiKey,
-    model: s.model,
-    system,
-    contents: [{ role: 'user', parts: [{ text: user }] }],
-    signal,
-    onText,
-  });
-  return res.text;
+## Pendientes para ${bossName()} (lista corta)`;
+  return dualGenerate({ system, user, signal, onText, preferGroq: false });
 }
 
 // ---------------- Métricas desde captura ----------------

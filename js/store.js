@@ -36,6 +36,16 @@ export const DEFAULTS = {
     searchProvider: 'tavily', // 'tavily' | 'google'
     webSearch: true,
     sources: DEFAULT_SOURCES,
+    groqKey: '',
+    groqModel: 'llama-3.3-70b-versatile',
+    groqFastModel: 'llama-3.1-8b-instant',
+    groqKnownModels: [],
+    groqMeetings: true, // turnos de los agentes en la sala de juntas
+    groqFallback: true, // respaldo cuando Gemini llega al límite
+  },
+  boss: {
+    name: 'Kike',
+    look: { shirt: '#1d2433', skin: '#c68642', hair: '#2b1b12', hairStyle: 'short' },
   },
   brief: {
     marca: 'Vacilando Ando Tours',
@@ -98,6 +108,7 @@ function read(key) {
   if (stored === undefined) return fallback;
   // Mezcla con los valores por defecto para que campos nuevos siempre existan.
   if (key === 'settings' || key === 'brief') return { ...fallback, ...stored };
+  if (key === 'boss') return { ...fallback, ...stored, look: { ...fallback.look, ...(stored.look || {}) } };
   if (key === 'agents') {
     const out = {};
     for (const id of AGENT_IDS) {
@@ -138,6 +149,7 @@ export function save(key) {
 export const settings = () => get('settings');
 export const brief = () => get('brief');
 export const agents = () => get('agents');
+export const boss = () => get('boss');
 export const chat = (id) => get('chat:' + id);
 
 // ---------- Respaldo ----------
@@ -148,6 +160,7 @@ export function exportAll({ includeKeys = false } = {}) {
   if (!includeKeys) {
     data.settings.geminiKey = '';
     data.settings.tavilyKey = '';
+    data.settings.groqKey = '';
   }
   return { app: 'la-oficina-vacilando', version: 1, exportedAt: new Date().toISOString(), data };
 }
@@ -166,6 +179,7 @@ export function importAll(payload) {
         ...value,
         geminiKey: value.geminiKey || current.geminiKey,
         tavilyKey: value.tavilyKey || current.tavilyKey,
+        groqKey: value.groqKey || current.groqKey,
       };
     }
     set(key, value);

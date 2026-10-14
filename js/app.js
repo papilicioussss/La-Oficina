@@ -4,7 +4,7 @@ import { h, toast } from './ui.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go } from './state.js';
-import { mountOffice, setActiveRoom, avatarSvg } from './office.js';
+import { mountOffice, setActiveRoom, avatarSvg, bossGoTo, bossPlace, visit } from './office.js';
 import { renderHome } from './home.js';
 import { renderAgentPanel } from './chat.js';
 import { renderMeetingPanel, recoverMeetings } from './meeting.js';
@@ -15,6 +15,7 @@ const panel = document.getElementById('panel');
 const dock = document.getElementById('dock');
 let cleanup = null;
 let currentKey = '';
+let firstRoute = true;
 
 function parseRoute() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -33,7 +34,7 @@ function renderDock(view) {
       const busy = st !== 'idle' && st !== 'meeting';
       return h(
         'button',
-        { class: `dock-btn${active === id ? ' is-active' : ''}`, type: 'button', onClick: () => go(`#/agente/${id}`), 'aria-label': `Oficina de ${agents[id].name}` },
+        { class: `dock-btn${active === id ? ' is-active' : ''}`, type: 'button', onClick: () => visit(id), 'aria-label': `Ir a la oficina de ${agents[id].name}` },
         avatarSvg(agents[id].look),
         agents[id].name,
         h('span', { class: `status-dot${busy ? ' is-busy' : ''}`, 'aria-hidden': 'true' })
@@ -41,7 +42,7 @@ function renderDock(view) {
     }),
     h(
       'button',
-      { class: `dock-btn${active === 'juntas' ? ' is-active' : ''}`, type: 'button', onClick: () => go('#/juntas') },
+      { class: `dock-btn${active === 'juntas' ? ' is-active' : ''}`, type: 'button', onClick: () => visit('juntas') },
       h('span', { class: 'dock-icon', 'aria-hidden': 'true' }, '🤝'),
       'Sala de juntas',
       h('span', { class: `status-dot${runtime.meetingBusy ? ' is-busy' : ''}`, 'aria-hidden': 'true' })
@@ -56,6 +57,11 @@ function route() {
   setActiveRoom(view.type === 'agent' ? view.id : view.type === 'meeting' ? 'juntas' : null);
   if (key === currentKey) return;
   currentKey = key;
+
+  // El avatar del jefe va hasta el agente o la sala (al abrir la app, aparece directo ahí).
+  const where = view.type === 'agent' ? view.id : view.type === 'meeting' ? 'meeting' : null;
+  if (where) firstRoute ? bossPlace(where) : bossGoTo(where);
+  firstRoute = false;
   cleanup?.();
   cleanup = null;
 

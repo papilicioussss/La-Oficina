@@ -8,6 +8,7 @@ Oficina virtual isométrica con **3 agentes de IA** que te ayudan con el conteni
 | 📊 Análisis | Analista | Tendencias de TikTok e Instagram (con búsqueda web) y análisis de tus métricas cargadas a mano o desde capturas de Insights / TikTok Analytics. |
 | 🎬 Guiones | Guionista y estratega | Guiones para Reels y TikTok (tabla de tomas, texto en pantalla y voz), análisis y mejora de tus guiones, series y carruseles. |
 | 🤝 Sala de juntas | Los tres | Lluvia de ideas: investigan en la web lo más reciente, cada uno aporta desde su área, tú opinas y al final arman un **plan de contenido** listo para grabar. |
+| 👑 Tu oficina | Tú (el jefe) | Tu avatar: camina hasta el agente que tocas para consultarle y preside las reuniones desde la cabecera. |
 
 La app **no hace** documentos, edición de video, flyers ni identidad visual: solo texto, guiones y análisis.
 
@@ -17,6 +18,8 @@ La app **no hace** documentos, edición de video, flyers ni identidad visual: so
 
 1. **API key de Google AI Studio (Gemini)** → <https://aistudio.google.com/apikey>. Es el "cerebro" de los agentes.
 2. **API key de Tavily** (recomendada) → <https://app.tavily.com>. Es el buscador web de los agentes. El plan gratis trae 1.000 créditos al mes (una búsqueda básica gasta 1).
+
+3. **API key de Groq** (opcional) → <https://console.groq.com/keys>. Respuestas rapidísimas con plan gratis aparte. La app lo usa en los turnos de la sala de juntas, para preparar las búsquedas y como **respaldo automático** cuando Gemini llega a su límite (marcado con ⚡ Groq). Gemini sigue a cargo de leer capturas y de buscar con Google.
 
 > Si no quieres usar Tavily, en *Configuración → Claves* puedes elegir **"Google vía Gemini"**: usa la búsqueda de Google que trae Gemini y no necesita otra key, pero gasta tu cuota de Gemini.
 
@@ -37,6 +40,7 @@ La app **no hace** documentos, edición de video, flyers ni identidad visual: so
 
 ## Cómo se usa
 
+- **Tu avatar:** toca un agente (o su botón abajo) y caminas hasta su escritorio para consultarle. Toca cualquier punto del piso para caminar, o muévete con las flechas / WASD en la computadora. Personalízalo en Configuración → Equipo.
 - **Toca una oficina o un personaje** para chatear con ese agente. Los atajos de abajo te dan ideas de qué pedir.
 - **📎 Imagen**: adjunta capturas o fotos (por ejemplo, tus Insights) y el agente las lee.
 - **🔎 Web: sí/no**: activa o apaga la búsqueda web para ahorrar créditos.
@@ -87,6 +91,7 @@ js/prompts.js         roles e instrucciones de cada agente
 js/brain.js           llamadas a Gemini, búsqueda web y sala de juntas
 js/gemini.js          cliente de la API de Gemini (streaming)
 js/search.js          cliente de Tavily
+js/groq.js            cliente de Groq (opcional: reuniones y respaldo)
 js/chat.js            panel de chat de cada oficina
 js/conversation.js    enviar / detener / reintentar mensajes
 js/meeting.js         sala de juntas

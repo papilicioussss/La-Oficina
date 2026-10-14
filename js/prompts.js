@@ -121,6 +121,10 @@ export function today() {
   return new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+export function bossName() {
+  return (store.boss().name || 'Kike').trim();
+}
+
 export function agentName(id) {
   return store.agents()[id]?.name || ROLES[id].title;
 }
@@ -135,7 +139,7 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
     .join(' y ');
 
   const parts = [
-    `Eres ${a.name}, ${role.title.toLowerCase()} de "La Oficina", el equipo virtual de contenido de ${marca}. Trabajas para Kike, Social Media, Community y Content Manager de la marca.`,
+    `Eres ${a.name}, ${role.title.toLowerCase()} de "La Oficina", el equipo virtual de contenido de ${marca}. Trabajas para ${bossName()}, tu jefe: Social Media, Community y Content Manager de la marca.`,
     `Hoy es ${today()}.`,
     `## Tu personalidad\n${a.personality || 'Profesional, cercana y práctica.'}`,
     `## Reglas del equipo
