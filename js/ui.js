@@ -158,7 +158,7 @@ export function openModal({ title, body, actions = [], wide = false, onClose }) 
             'footer',
             { class: 'modal-foot' },
             actions.map((a) =>
-              h('button', { class: `btn btn-${a.kind || 'ghost'}`, type: 'button', onClick: () => a.onClick?.(close) }, a.label)
+              h('button', { class: `btn btn-${a.kind || 'ghost'}`, type: 'button', onClick: (e) => a.onClick?.(close, e.currentTarget) }, a.label)
             )
           )
         : null

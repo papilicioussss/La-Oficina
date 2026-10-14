@@ -84,3 +84,14 @@ export function skillsPrompt(list) {
     : '## Criterios base de trabajo';
   return `${head}\n\n${list.map((s) => `### ${s.name}\n${s.text}`).join('\n\n')}`;
 }
+
+/** Para la interfaz: qué habilidades se activarían con este texto y por qué (palabras que coincidieron). */
+export function explainPick(agentId, query = '') {
+  const q = norm(query);
+  const mine = skillsFor(agentId).filter((s) => isEnabled(s.id) && !s.core);
+  return mine
+    .map((s) => ({ skill: s, matched: s.kw.filter((kw) => kwRegex(kw).test(q)), n: score(s, q) }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, MAX_EXTRA);
+}

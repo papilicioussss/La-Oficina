@@ -65,7 +65,8 @@ La app **no hace** documentos, edición de video, flyers ni identidad visual: so
 Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psicología del consumidor, ofertas, WhatsApp y cierre, community, stories, tendencias, algoritmos, métricas, medición de ventas, competencia, público, pruebas A/B, estacionalidad, informes, estructura de guiones, formatos de turismo, storytelling, calendario editorial, series, análisis de guiones, creadores e influencers, lanzamientos, reutilización de contenido, SEO social y más.
 
 - **Se activan solas** según lo que pidas (máximo 3 a la vez, más las básicas), así gastas pocos tokens. En cada respuesta ves cuáles usó (🛠).
-- **Puedes elegirlas a mano** con el botón "🛠 Skills" del chat.
+- **"✨ Elegir skills por mí"**: escribes lo que necesitas, tocas ✨ y te propone las skills que encajan (versión simple, por palabras clave, gratis). Si quieres, "🤖 Afinar con IA" las elige con un modelo rápido (gasta 1 consulta gratis). Revisas, marcas/desmarcas y das "Usar estas".
+- **Puedes elegirlas a mano** con el botón "🛠 Manual" del chat.
 - En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
 
 ## Ahorro de tokens y modelo automático
@@ -137,6 +138,7 @@ js/cat-chat.js        panel del gato
 js/memory.js          memoria de la marca
 js/skills-data.js     biblioteca de skills de marketing
 js/skills.js          selección de skills según la consulta
+js/skills-ai.js       "Elegir skills por mí" con IA (opcional)
 js/router.js          elige el modelo según la tarea y recorta el historial
 js/chat.js            panel de chat de cada oficina
 js/conversation.js    enviar / detener / reintentar mensajes
