@@ -95,6 +95,8 @@ export const DEFAULTS = {
   memory: [],
   meetings: [],
   metrics: [],
+  favs: [], // biblioteca de favoritos: copys, guiones, hooks guardados
+  fechas: [], // fechas propias de Kike para el calendario
   'chat:copy': [],
   'chat:analista': [],
   'chat:guion': [],

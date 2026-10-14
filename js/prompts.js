@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { digest } from './metrics-calc.js';
 import { memoryText, gaps, MEM_CATS, facts } from './memory.js';
 import { pickSkills, skillsPrompt } from './skills.js';
+import { calendarPrompt } from './calendar-ve.js';
 
 export const ROLES = {
   copy: {
@@ -186,6 +187,9 @@ export function buildSystemPrompt(id, { searchAvailable = false, meeting = false
 
   const brief = briefText();
   if (brief) parts.push(`## Brief de la marca\n${brief}`);
+
+  const fechas = calendarPrompt();
+  if (fechas) parts.push(fechas);
 
   const memory = memoryText();
   parts.push(

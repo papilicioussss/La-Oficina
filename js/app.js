@@ -11,6 +11,8 @@ import { renderHome } from './home.js';
 import { renderAgentPanel } from './chat.js';
 import { renderMeetingPanel, recoverMeetings } from './meeting.js';
 import { renderSettings } from './settings.js';
+import { renderFavs } from './favs.js';
+import { renderCalendar } from './calendar-view.js';
 import { recoverChats } from './conversation.js';
 
 const panel = document.getElementById('panel');
@@ -25,6 +27,8 @@ function parseRoute() {
   if (parts[0] === 'agente' && AGENT_IDS.includes(parts[1])) return { type: 'agent', id: parts[1], tab: parts[2] === 'metricas' ? 'metricas' : 'chat' };
   if (parts[0] === 'juntas') return { type: 'meeting', id: parts[1] };
   if (parts[0] === 'gato') return { type: 'cat' };
+  if (parts[0] === 'favoritos') return { type: 'favs' };
+  if (parts[0] === 'fechas') return { type: 'fechas' };
   if (parts[0] === 'config') return { type: 'settings', tab: parts[1] || 'claves' };
   return { type: 'home' };
 }
@@ -145,6 +149,8 @@ function route() {
   else if (view.type === 'meeting') cleanup = renderMeetingPanel(panel, view.id);
   else if (view.type === 'cat') cleanup = renderCatPanel(panel);
   else if (view.type === 'settings') cleanup = renderSettings(panel, view.tab);
+  else if (view.type === 'favs') cleanup = renderFavs(panel);
+  else if (view.type === 'fechas') cleanup = renderCalendar(panel);
   else cleanup = renderHome(panel);
 
   if (!sheet && window.matchMedia('(max-width: 900px)').matches) window.scrollTo({ top: 0 });

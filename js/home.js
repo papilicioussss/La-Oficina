@@ -6,6 +6,7 @@ import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
+import { eventsBetween, todayISO, rangeLabel, whenLabel, KIND_META } from './calendar-ve.js';
 
 function checklist() {
   const s = store.settings();
@@ -54,6 +55,41 @@ function agentCard(id) {
   );
 }
 
+function upcomingBlock() {
+  const next = eventsBetween(todayISO(), 60)
+    .filter((ev) => ev.kind !== 'escolar')
+    .slice(0, 3);
+  return h(
+    'div',
+    null,
+    h('div', { class: 'section-title' }, 'Lo que viene'),
+    next.length
+      ? h(
+          'ul',
+          { class: 'list-plain' },
+          next.map((ev) =>
+            h(
+              'li',
+              null,
+              h(
+                'button',
+                { class: 'list-row', type: 'button', onClick: () => go('#/fechas') },
+                h('span', null, (KIND_META[ev.kind] || KIND_META.feriado).icon),
+                h('span', { class: 'grow' }, h('strong', null, ev.title), h('small', null, `${rangeLabel(ev)} · ${whenLabel(ev)}`))
+              )
+            )
+          )
+        )
+      : h('p', { class: 'hint' }, 'Nada en los próximos 2 meses.'),
+    h(
+      'div',
+      { class: 'chips mt-3' },
+      h('button', { class: 'chip', type: 'button', onClick: () => go('#/fechas') }, '📅 Ver todas las fechas'),
+      h('button', { class: 'chip', type: 'button', onClick: () => go('#/favoritos') }, `⭐ Favoritos (${store.get('favs').length})`)
+    )
+  );
+}
+
 export function renderHome(panel) {
   const meetings = store.get('meetings').slice(0, 3);
   const cards = h('div', { class: 'agent-cards' });
@@ -83,6 +119,7 @@ export function renderHome(panel) {
           h('span', null, 'Lluvia de ideas con los tres, con investigación web de lo último en contenido.')
         )
       ),
+      upcomingBlock(),
       meetings.length
         ? h(
             'div',

@@ -69,6 +69,11 @@ Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psi
 - **Puedes elegirlas a mano** con el botón "🛠 Manual" del chat.
 - En **Configuración → 🛠️ Habilidades** las activas o desactivas, las dejas "Siempre", lees sus instrucciones y **creas las tuyas**.
 
+## Favoritos y fechas para vender
+
+- **⭐ Favoritos** (barra de arriba): debajo de cada respuesta de un agente tienes "⭐ Guardar". Le pones título, tipo (copy, hook, guion, análisis) y etiquetas, y luego buscas y filtras en la biblioteca. Desde ahí lo copias, se lo pasas a Nico, Alex o Sam, lo editas o lo borras. Va incluido en el respaldo de Configuración → Datos.
+- **📅 Fechas**: feriados de Venezuela, fines de semana largos (Carnaval, Semana Santa, Navidad…), posibles puentes, vacaciones escolares (aproximadas) y fechas comerciales (San Valentín, Día de la Madre, Black Friday…). Todo se calcula en la app, sin internet. Puedes agregar tus propias fechas. Los agentes ven las fechas de las próximas 6 semanas y las usan al proponer contenido; cada fecha tiene "💡 Ideas con Nico". Confirma siempre con el anuncio oficial: el gobierno a veces mueve días o decreta extras.
+
 ## Ahorro de tokens y modelo automático
 
 - **Modelo según la tarea:** los agentes y el gato eligen solos. Un saludo o un "gracias" usa el modelo rápido (o Groq si está activo), con un prompt mínimo y sin herramientas; lo normal usa el modelo principal; las tareas grandes (planes, análisis, guiones completos, fotos, textos largos) usan el modelo potente si lo configuras en Configuración → Claves. En la respuesta ves la etiqueta ⚡ rápido o 🧠 potente.
@@ -139,6 +144,9 @@ js/memory.js          memoria de la marca
 js/skills-data.js     biblioteca de skills de marketing
 js/skills.js          selección de skills según la consulta
 js/skills-ai.js       "Elegir skills por mí" con IA (opcional)
+js/favs.js            biblioteca de favoritos
+js/calendar-ve.js     feriados, puentes y fechas comerciales de Venezuela
+js/calendar-view.js   vista "Fechas"
 js/router.js          elige el modelo según la tarea y recorta el historial
 js/chat.js            panel de chat de cada oficina
 js/conversation.js    enviar / detener / reintentar mensajes

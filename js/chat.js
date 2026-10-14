@@ -3,6 +3,7 @@
 import { h, toast, copyText, fileToImagePart, isTouch, confirmDialog, domainOf, openModal } from './ui.js';
 import { skillsFor, isEnabled, explainPick, skillById } from './skills.js';
 import { suggestSkillsAI } from './skills-ai.js';
+import { favModal } from './favs.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
 import { runtime, on, go, STATUS_LABEL } from './state.js';
@@ -42,6 +43,7 @@ function msgActions(agentId, m) {
     'div',
     { class: 'msg-actions' },
     h('button', { class: 'chip', type: 'button', onClick: () => copyText(toPlain(m.text)) }, '📋 Copiar'),
+    h('button', { class: 'chip', type: 'button', title: 'Guardar en tu biblioteca de favoritos', onClick: () => favModal({ text: toPlain(m.text), agentId }) }, '⭐ Guardar'),
     others.map((id) =>
       h(
         'button',
