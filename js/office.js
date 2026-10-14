@@ -25,15 +25,36 @@ function shade(hex, amt) {
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
+/** Taquitos tipo LEGO sobre la tapa de una caja (solo en piezas lo bastante grandes). */
+function studs(x, y, z, w, d, h, top) {
+  const nx = Math.min(5, Math.floor(w / 0.6));
+  const ny = Math.min(5, Math.floor(d / 0.6));
+  const g = s('g', { class: 'studs', 'pointer-events': 'none' });
+  const side = shade(top, -0.22);
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      const [px, py] = iso(x + ((i + 0.5) * w) / nx, y + ((j + 0.5) * d) / ny, z + h);
+      g.append(
+        s('ellipse', { cx: px.toFixed(1), cy: (py + 1.3).toFixed(1), rx: 2.5, ry: 1.25, fill: side }),
+        s('rect', { x: (px - 2.5).toFixed(1), y: (py - 0.1).toFixed(1), width: 5, height: 1.4, fill: side }),
+        s('ellipse', { cx: px.toFixed(1), cy: py.toFixed(1), rx: 2.5, ry: 1.25, fill: top, stroke: side, 'stroke-width': 0.4 })
+      );
+    }
+  }
+  return g;
+}
+
 function box(x, y, z, w, d, h, color, extra = {}) {
   const [top, left, right] = Array.isArray(color) ? color : [shade(color, 0.12), color, shade(color, -0.14)];
-  return s(
+  const g = s(
     'g',
     extra,
     s('polygon', { points: P([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]]), fill: left, ...EDGE }),
     s('polygon', { points: P([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]]), fill: right, ...EDGE }),
     s('polygon', { points: P([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]]), fill: top, ...EDGE })
   );
+  if (w >= 1.2 && d >= 1.2 && h >= 0.05 && z + h > 0.04) g.append(studs(x, y, z, w, d, h, top));
+  return g;
 }
 
 const quadY = (x1, x2, z1, z2, y = 0) => P([[x1, y, z1], [x2, y, z1], [x2, y, z2], [x1, y, z2]]);
@@ -374,18 +395,123 @@ function hairBack(look) {
   return s('rect', { x: -10.6, y: -40, width: 21.2, height: 17, rx: 6, fill: look.hair || '#1b1b1b' });
 }
 
+const INK = '#2b2f3a';
+
+/** Accesorios y ropa por agente (se activan con look.kit: 'copy' | 'analista' | 'guion'). */
+function kitParts(look) {
+  const shirt = look.shirt || '#008ec7';
+  const kit = look.kit;
+  const out = { collar: [], front: [], head: [], armL: [], armR: [], fx: [] };
+  const hoodie = () => {
+    out.collar.push(
+      s('path', { d: 'M-8.6 -26.5 Q0 -19.5 8.6 -26.5 L8.6 -24.2 Q0 -16.6 -8.6 -24.2 Z', fill: shade(shirt, -0.22) }),
+      s('rect', { x: -5.2, y: -16.5, width: 10.4, height: 5.2, rx: 1.6, fill: shade(shirt, -0.14) }),
+      s('path', { d: 'M-2 -21 L-2.4 -16.8 M2 -21 L2.4 -16.8', stroke: '#ffffff', 'stroke-width': 0.8, 'stroke-linecap': 'round' })
+    );
+  };
+  if (kit === 'copy') {
+    hoodie();
+    out.head.push(
+      s('path', { class: 'acc-cap', d: 'M-9.9 -39.5 C-10 -50 10 -50 9.9 -39.5 Z', fill: shade(shirt, -0.12) }),
+      s('path', { d: 'M-10.2 -40 L14.2 -40 Q14.6 -37.8 11.8 -37.6 L-10.2 -38 Z', fill: shade(shirt, -0.32) }),
+      s('path', { d: 'M-10.6 -38 C-11.6 -55 11.6 -55 10.6 -38', stroke: INK, 'stroke-width': 1.7, fill: 'none', 'stroke-linecap': 'round' }),
+      s('rect', { x: -12.6, y: -41, width: 3.6, height: 8, rx: 1.6, fill: INK }),
+      s('rect', { x: 9, y: -41, width: 3.6, height: 8, rx: 1.6, fill: INK })
+    );
+    out.armR.push(
+      s(
+        'g',
+        { class: 'acc-note', transform: 'translate(13.5,-15)' },
+        s('rect', { x: -3.6, y: -5.4, width: 7.2, height: 10.8, rx: 1, fill: '#ffb36b', stroke: 'rgba(0,0,0,.25)', 'stroke-width': 0.5 }),
+        s('rect', { x: -2.6, y: -4.4, width: 5.4, height: 8.8, rx: 0.6, fill: '#fffdf5' }),
+        s('path', { d: 'M-1.4 -2 H1.8 M-1.4 0.2 H1.8 M-1.4 2.4 H0.6', stroke: '#b9b09a', 'stroke-width': 0.6 })
+      )
+    );
+    out.fx.push(
+      s(
+        'g',
+        { class: 'fx fx-idea', transform: 'translate(13,-50)' },
+        s('circle', { r: 3.4, fill: '#ffd54a', stroke: '#e0a800', 'stroke-width': 0.6 }),
+        s('rect', { x: -1.5, y: 3, width: 3, height: 1.8, rx: 0.6, fill: '#8a8f9c' }),
+        s('path', { d: 'M-5.5 -4 L-4 -3 M5.5 -4 L4 -3 M0 -6.6 V-5', stroke: '#e0a800', 'stroke-width': 0.8, 'stroke-linecap': 'round' })
+      )
+    );
+  } else if (kit === 'analista') {
+    out.collar.push(
+      s('path', { d: 'M-8.6 -26.5 L-2.2 -26.5 L-2.2 -9.5 L-8.6 -9.5 Z', fill: shade(shirt, -0.38) }),
+      s('path', { d: 'M8.6 -26.5 L2.2 -26.5 L2.2 -9.5 L8.6 -9.5 Z', fill: shade(shirt, -0.38) }),
+      s('path', { d: 'M-2.2 -26.5 L2.2 -26.5 L2.2 -9.5 L-2.2 -9.5 Z', fill: '#f2f5f8' }),
+      s('path', { d: 'M-3.4 -26.4 L0 -21.6 L3.4 -26.4', fill: 'none', stroke: shade(shirt, -0.5), 'stroke-width': 0.8 })
+    );
+    out.head.push(
+      s(
+        'g',
+        { class: 'acc-glasses', fill: 'rgba(255,255,255,.18)', stroke: INK, 'stroke-width': 1 },
+        s('circle', { cx: -3.7, cy: -35.4, r: 2.9 }),
+        s('circle', { cx: 3.7, cy: -35.4, r: 2.9 }),
+        s('path', { d: 'M-0.8 -35.6 H0.8 M-6.6 -35.8 L-9.4 -36.6 M6.6 -35.8 L9.4 -36.6', fill: 'none' })
+      )
+    );
+    out.armL.push(
+      s(
+        'g',
+        { class: 'acc-tablet', transform: 'translate(-14.5,-15)' },
+        s('rect', { x: -4.4, y: -6.2, width: 8.8, height: 12, rx: 1.4, fill: INK }),
+        s('rect', { x: -3.4, y: -5, width: 6.8, height: 9.6, rx: 0.6, fill: '#d6edf8' }),
+        s('rect', { class: 'chart-bar', x: -2.6, y: -0.6, width: 1.5, height: 4, fill: '#ff8a3d' }),
+        s('rect', { class: 'chart-bar', x: -0.7, y: -2.6, width: 1.5, height: 6, fill: '#0078ab' }),
+        s('rect', { class: 'chart-bar', x: 1.2, y: -1.6, width: 1.5, height: 5, fill: '#30bb4f' })
+      )
+    );
+    out.fx.push(
+      s(
+        'g',
+        { class: 'fx fx-search', transform: 'translate(-13,-49)' },
+        s('circle', { r: 3, fill: 'rgba(255,255,255,.7)', stroke: INK, 'stroke-width': 1 }),
+        s('path', { d: 'M2.2 2.2 L5 5', stroke: INK, 'stroke-width': 1.4, 'stroke-linecap': 'round' })
+      )
+    );
+  } else if (kit === 'guion') {
+    hoodie();
+    out.collar.push(
+      s('path', { d: 'M-9.4 -31 C-9.6 -21 9.6 -21 9.4 -31', stroke: INK, 'stroke-width': 1.6, fill: 'none' }),
+      s('rect', { x: -12, y: -32, width: 3.6, height: 7, rx: 1.5, fill: INK }),
+      s('rect', { x: 8.4, y: -32, width: 3.6, height: 7, rx: 1.5, fill: INK })
+    );
+    const card = (cls, rot) =>
+      s(
+        'g',
+        { class: `card ${cls}`, transform: `rotate(${rot})` },
+        s('rect', { x: -3.4, y: -5, width: 6.8, height: 9.6, rx: 0.8, fill: '#fffdf5', stroke: 'rgba(0,0,0,.25)', 'stroke-width': 0.5 }),
+        s('path', { d: 'M-2 -2.8 H2 M-2 -0.8 H1 M-2 1.2 H2', stroke: shade(shirt, -0.1), 'stroke-width': 0.7 })
+      );
+    out.armR.push(s('g', { class: 'acc-cards', transform: 'translate(13.5,-15)' }, card('c1', -14), card('c2', 0), card('c3', 14)));
+    out.fx.push(
+      s(
+        'g',
+        { class: 'fx fx-check', transform: 'translate(13,-49)' },
+        s('circle', { r: 3.8, fill: '#2fb361' }),
+        s('path', { d: 'M-2 0 L-0.5 1.6 L2.2 -1.6', stroke: '#fff', 'stroke-width': 1.3, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+      )
+    );
+  }
+  return out;
+}
+
 export function spriteParts(look, { withLegs = true } = {}) {
   const shirt = look.shirt || '#008ec7';
   const skin = look.skin || '#c68642';
   const dark = shade(shirt, -0.2);
+  const kit = kitParts(look);
+  const hand = (x) => s('rect', { x: x - 2.4, y: -14.6, width: 4.8, height: 4.4, rx: 1.8, fill: skin });
   const parts = [];
   if (withLegs) {
     parts.push(
       s(
         'g',
         { class: 'legs' },
-        s('g', { class: 'leg leg-l' }, s('rect', { x: -5.6, y: -11, width: 4.6, height: 11, rx: 2, fill: PANTS }), s('ellipse', { cx: -3.3, cy: -0.6, rx: 3, ry: 1.6, fill: '#1d2433' })),
-        s('g', { class: 'leg leg-r' }, s('rect', { x: 1, y: -11, width: 4.6, height: 11, rx: 2, fill: PANTS }), s('ellipse', { cx: 3.3, cy: -0.6, rx: 3, ry: 1.6, fill: '#1d2433' }))
+        s('g', { class: 'leg leg-l' }, s('rect', { x: -6.8, y: -9, width: 6.6, height: 9, rx: 1, fill: PANTS }), s('rect', { x: -7.2, y: -2, width: 7.4, height: 2, rx: 0.8, fill: '#1d2433' })),
+        s('g', { class: 'leg leg-r' }, s('rect', { x: 0.2, y: -9, width: 6.6, height: 9, rx: 1, fill: PANTS }), s('rect', { x: -0.2, y: -2, width: 7.4, height: 2, rx: 0.8, fill: '#1d2433' }))
       )
     );
   }
@@ -394,34 +520,41 @@ export function spriteParts(look, { withLegs = true } = {}) {
       'g',
       { class: 'body-bob' },
       hairBack(look),
-      s('g', { class: 'arm arm-l' }, s('rect', { x: -12, y: -25, width: 4.6, height: 12, rx: 2.3, fill: dark }), s('circle', { cx: -9.7, cy: -12.6, r: 2.3, fill: skin })),
-      s('g', { class: 'arm arm-r' }, s('rect', { x: 7.4, y: -25, width: 4.6, height: 12, rx: 2.3, fill: dark }), s('circle', { cx: 9.7, cy: -12.6, r: 2.3, fill: skin })),
-      s('rect', { x: -8.6, y: -26.5, width: 17.2, height: 17, rx: 6, fill: shirt }),
+      s('g', { class: 'arm arm-l' }, s('rect', { x: -12.2, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(-9.8), ...kit.armL),
+      s('g', { class: 'arm arm-r' }, s('rect', { x: 7.4, y: -25.5, width: 4.8, height: 12, rx: 1.8, fill: dark }), hand(9.8), ...kit.armR),
+      // cadera
+      s('rect', { x: -8.8, y: -12, width: 17.6, height: 4, rx: 1, fill: shade(PANTS, -0.08) }),
+      // torso trapezoidal
+      s('path', { d: 'M-8 -26.5 L8 -26.5 L8.9 -11.5 L-8.9 -11.5 Z', fill: shirt, stroke: shade(shirt, -0.25), 'stroke-width': 0.5, 'stroke-linejoin': 'round' }),
       s('path', { d: 'M-3.2 -26.4 L0 -22.6 L3.2 -26.4 Z', fill: shade(shirt, 0.35) }),
-      s('rect', { x: -2.4, y: -29.5, width: 4.8, height: 4, fill: shade(skin, -0.1) }),
-      s('circle', { cx: -9.2, cy: -35, r: 2.3, fill: skin }),
-      s('circle', { cx: 9.2, cy: -35, r: 2.3, fill: skin }),
-      s('circle', { cx: 0, cy: -36, r: 9.5, fill: skin }),
+      ...kit.collar,
+      s('rect', { x: -2.6, y: -29.5, width: 5.2, height: 4, fill: shade(skin, -0.1) }),
+      // cabeza cilíndrica con taquito
+      s('rect', { x: -3.4, y: -48.4, width: 6.8, height: 3.4, rx: 1.2, fill: shade(skin, -0.12) }),
+      s('rect', { x: -9.6, y: -46, width: 19.2, height: 17.5, rx: 3.6, fill: skin }),
       hair(look),
       s(
         'g',
         { class: 'face' },
+        s('g', { class: 'brows' }, s('path', { class: 'brow brow-l', d: 'M-5.6 -39.4 Q-3.6 -40.4 -1.4 -39.6', stroke: '#3a2a20', 'stroke-width': 1, fill: 'none', 'stroke-linecap': 'round' }), s('path', { class: 'brow brow-r', d: 'M1.4 -39.6 Q3.6 -40.4 5.6 -39.4', stroke: '#3a2a20', 'stroke-width': 1, fill: 'none', 'stroke-linecap': 'round' })),
         s(
           'g',
           { class: 'eyes' },
-          s('ellipse', { cx: -3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' }),
-          s('ellipse', { cx: 3.3, cy: -35.2, rx: 1.25, ry: 1.6, fill: '#1d2433' })
+          s('ellipse', { cx: -3.3, cy: -35.4, rx: 1.25, ry: 1.6, fill: '#1d2433' }),
+          s('ellipse', { cx: 3.3, cy: -35.4, rx: 1.25, ry: 1.6, fill: '#1d2433' })
         ),
-        s('circle', { cx: -5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
-        s('circle', { cx: 5.6, cy: -32.2, r: 1.8, fill: '#ff8a80', opacity: 0.45 }),
-        s('path', { class: 'mouth', d: 'M-2.6 -31 Q0 -28.8 2.6 -31', stroke: '#6b3a2a', 'stroke-width': 1.3, fill: 'none', 'stroke-linecap': 'round' })
+        s('circle', { cx: -5.8, cy: -32.4, r: 1.7, fill: '#ff8a80', opacity: 0.4 }),
+        s('circle', { cx: 5.8, cy: -32.4, r: 1.7, fill: '#ff8a80', opacity: 0.4 }),
+        s('path', { class: 'mouth', d: 'M-2.6 -31.4 Q0 -29.2 2.6 -31.4', stroke: '#6b3a2a', 'stroke-width': 1.3, fill: 'none', 'stroke-linecap': 'round' })
       ),
+      ...kit.head,
       // nuca: se ve cuando el personaje está de espaldas
       s('path', {
         class: 'back-hair',
         d: 'M-9.9 -36 C-10.5 -48 10.5 -48 9.9 -36 C9.6 -30 6 -27.2 0 -27.2 C-6 -27.2 -9.6 -30 -9.9 -36 Z',
         fill: look.hairStyle === 'gorra' ? shade(look.hair || '#1b1b1b', -0.1) : look.hair || '#1b1b1b',
-      })
+      }),
+      ...kit.fx
     )
   );
   return parts;
@@ -1386,7 +1519,19 @@ on('cat-status', ({ status }) => {
 export function mountOffice(container) {
   renderOffice(container);
   bindKeys();
-  on('status', ({ id }) => charEls[id] && updateBubble(charEls[id], id));
+  const prevStatus = {};
+  on('status', ({ id, status }) => {
+    const el = charEls[id];
+    if (!el) return;
+    updateBubble(el, id);
+    // gesto corto al terminar de trabajar (solo visual; no cambia ningún estado)
+    const was = prevStatus[id];
+    prevStatus[id] = status;
+    if ((was === 'thinking' || was === 'searching') && (status === 'idle' || status === 'meeting')) {
+      el.classList.add('done');
+      setTimeout(() => el.classList.remove('done'), 1700);
+    }
+  });
   on('agents-changed', () => renderOffice());
   catStart();
 }

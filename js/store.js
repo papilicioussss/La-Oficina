@@ -69,25 +69,25 @@ export const DEFAULTS = {
   },
   agents: {
     copy: {
-      name: 'Copy',
+      name: 'Nico',
       personality:
         'Chispa creativa con olfato vendedor. Habla con sabor venezolano sin exagerar y siempre piensa en cómo llevar a la gente al WhatsApp.',
       extra: '',
-      look: { shirt: '#ff8a3d', skin: '#e0ac69', hair: '#2b1b12', hairStyle: 'bun' },
+      look: { shirt: '#ff8a3d', skin: '#e0ac69', hair: '#2b1b12', hairStyle: 'short', kit: 'copy' },
     },
     analista: {
-      name: 'Analista',
+      name: 'Alex',
       personality:
         'Mente de datos que explica todo fácil. Va al grano, sin relleno, y desconfía de las modas que no tienen pruebas.',
       extra: '',
-      look: { shirt: '#008ec7', skin: '#c68642', hair: '#1b1b1b', hairStyle: 'short' },
+      look: { shirt: '#008ec7', skin: '#c68642', hair: '#1b1b1b', hairStyle: 'short', kit: 'analista' },
     },
     guion: {
-      name: 'Guionista',
+      name: 'Sam',
       personality:
         'Storyteller de pura cepa: piensa en escenas, en ritmo y en cómo enganchar a la gente desde el primer segundo hasta el final.',
       extra: '',
-      look: { shirt: '#00a100', skin: '#8d5524', hair: '#0f0f0f', hairStyle: 'curly' },
+      look: { shirt: '#7a5af8', skin: '#8d5524', hair: '#0f0f0f', hairStyle: 'curly', kit: 'guion' },
     },
   },
   // Gato asistente: nombre y memoria de la marca (datos que Kike le cuenta)
