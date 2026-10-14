@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { plastico, PALETA } from './materiales.js';
+import { crearCara, expresionBase } from './cara.js';
 
 const fabricas = new Map();
 export const registrarModelo = (nombre, fabrica) => fabricas.set(nombre, fabrica);
@@ -91,51 +92,6 @@ function geometriaMano(lado) {
   return g;
 }
 
-// ---------- Cara (cuatro variantes: ojos abiertos/cerrados × boca cerrada/abierta) ----------
-const caras = {};
-function textura(ojosCerrados, bocaAbierta) {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#1d2433';
-  g.strokeStyle = '#1d2433';
-  g.lineWidth = 6;
-  g.lineCap = 'round';
-  if (ojosCerrados) {
-    g.beginPath();
-    g.moveTo(76, 56);
-    g.quadraticCurveTo(88, 64, 100, 56);
-    g.moveTo(156, 56);
-    g.quadraticCurveTo(168, 64, 180, 56);
-    g.stroke();
-  } else {
-    g.beginPath();
-    g.ellipse(88, 52, 9, 13, 0, 0, Math.PI * 2);
-    g.ellipse(168, 52, 9, 13, 0, 0, Math.PI * 2);
-    g.fill();
-  }
-  g.strokeStyle = '#6b3a2a';
-  g.fillStyle = '#6b3a2a';
-  g.lineWidth = 7;
-  g.beginPath();
-  if (bocaAbierta) {
-    g.ellipse(128, 82, 17, 13, 0, 0, Math.PI);
-    g.fill();
-  } else {
-    g.arc(128, 74, 30, 0.25 * Math.PI, 0.75 * Math.PI);
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
-function texturaCara(ojosCerrados, bocaAbierta) {
-  const k = `${+ojosCerrados}${+bocaAbierta}`;
-  return (caras[k] ||= textura(ojosCerrados, bocaAbierta));
-}
-
 // Límites anatómicos (radianes) de cada articulación: nada se dobla más de lo que permite una minifigura real.
 const LIM = {
   cabY: [-0.9, 0.9], cabX: [-0.35, 0.45], cabZ: [-0.3, 0.3],
@@ -144,6 +100,7 @@ const LIM = {
   muneca: [-0.6, 0.6], giro: [-0.9, 0.9],
   pierna: [-0.6, 0.6],
 };
+const BASE_X = expresionBase();
 const CAMPOS = ['cabY', 'cabX', 'cabZ', 'torY', 'torX', 'torZ', 'bIx', 'bIa', 'bDx', 'bDa', 'mI', 'mD', 'rD', 'pI', 'pD', 'alto'];
 // Rapidez relativa de cada grupo: la cabeza y las muñecas reaccionan primero, el torso y los hombros después.
 // Ese desfase hace que un gesto "se propague" (cabeza → torso → brazos → manos) en vez de moverse todo a la vez.
@@ -203,16 +160,15 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
   const cabeza = grupo(0, 1.76, 0);
   cabeza.add(malla(new THREE.CylinderGeometry(0.72, 0.72, 0.95, 40), mPiel, 0, 0.48, 0));
   cabeza.add(malla(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 24), mPiel, 0, 1.05, 0));
-  const matCara = new THREE.MeshBasicMaterial({ map: texturaCara(false, false), transparent: true });
-  // En CylinderGeometry el ángulo 0 apunta a +z (x = sen θ, z = cos θ): la cara se centra en θ = 0 para que mire al FRENTE (+z).
-  // (Antes estaba centrada en -π/2, es decir en -x: por eso las caras salían giradas 90° respecto al cuerpo.)
-  const cara = new THREE.Mesh(new THREE.CylinderGeometry(0.725, 0.725, 0.95, 40, 1, true, -0.62, 1.24), matCara);
+  // cara estampada (ver cara.js): lámina curva centrada en el FRENTE (+z) con la expresión redibujada de forma continua
+  const rostro = crearCara(0.72, 0.95);
+  const cara = rostro.malla;
   cara.position.y = 0.48;
   cabeza.add(cara);
   if (gorra) {
     const mG = plastico(gorra);
-    cabeza.add(malla(new THREE.SphereGeometry(0.78, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), mG, 0, 0.72, 0));
-    cabeza.add(malla(caja(1.0, 0.1, 0.8, 0.04), mG, 0, 0.78, 0.86)); // visera al frente (+z)
+    cabeza.add(malla(new THREE.SphereGeometry(0.78, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), mG, 0, 0.86, 0));
+    cabeza.add(malla(caja(1.0, 0.1, 0.8, 0.04), mG, 0, 0.93, 0.86)); // visera al frente (+z), alta para dejar ver las cejas
   }
 
   torso.add(cabeza, bI.hombro, bD.hombro);
@@ -234,7 +190,9 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
   const VEL = {}; // velocidad de cada articulación (para arrancar y frenar con suavidad)
   const T = {}; // postura deseada
   const rap = { mI: 0, mD: 0 }; // movimientos finos y rápidos (tecleo) que se suman después de suavizar
-  const salida = { bocaAbierta: false, k: 7 };
+  const salida = { k: 7 };
+  const X = expresionBase(); // expresión deseada
+  const E = expresionBase(); // expresión actual (se acerca a X de forma continua)
   for (const c of CAMPOS) P[c] = VEL[c] = T[c] = 0;
   const mirada = { fase: 'frente', yaw: 0, pitch: 0, hasta: 1.5 };
   let ultimoVistazo = -1;
@@ -267,10 +225,10 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     T.bIa = 0.07;
     T.bDa = 0.07;
     rap.mI = rap.mD = 0;
+    Object.assign(X, BASE_X);
     const f = v.ritmo;
     const ph = v.fase;
     let k = 7; // rapidez general con la que la postura alcanza el objetivo
-    let boca = false;
 
     switch (estado) {
       case 'thinking': {
@@ -287,6 +245,15 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.cabY = 0.12 * Math.sin(t * 0.55 * f + ph) + 0.3 * pausa;
         T.torX = 0.05 - 0.04 * pausa;
         T.torY = T.cabY * 0.3;
+        // expresión: concentrado (cejas algo bajas y juntas, una un poco más alta), sonrisa mínima; al levantar la vista, ceja arriba
+        X.sonrisa = 0.15;
+        X.cejaIh = -0.2 + 0.5 * pausa;
+        X.cejaIt = 0.5 * (1 - pausa);
+        X.cejaDh = 0.1 + 0.6 * pausa;
+        X.cejaDt = 0.2 * (1 - pausa);
+        X.ojo = 0.9;
+        X.miraY = 0.6 - 1.4 * pausa; // mira la pantalla (abajo) y, al pensar, hacia arriba
+        X.miraX = 0.4 * pausa;
         const teclea = 1 - pausa;
         rap.mI = 0.1 * Math.sin(t * 28 * f) * teclea;
         rap.mD = 0.1 * Math.sin(t * 28 * f + 2.1) * teclea;
@@ -301,6 +268,12 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.cabY = 0.5 * Math.sin(t * 0.7 * f + ph);
         T.torY = T.cabY * 0.35; // el torso acompaña a la cabeza, con menos recorrido
         T.torZ = 0.03 * Math.sin(t * 0.7 * f + ph);
+        X.ojo = 0.85; // entrecierra un poco los ojos para enfocar
+        X.cejaIh = -0.1;
+        X.cejaDh = -0.1;
+        X.cejaIt = 0.25;
+        X.cejaDt = 0.25;
+        X.sonrisa = 0.2;
         break;
       case 'talking': {
         // Habla a "golpes" (beats): en cada uno la cabeza asiente, un instante después el brazo marca el acento.
@@ -324,7 +297,11 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.torX = 0.03 + 0.04 * cabeceo;
         T.torY = T.cabY * 0.45;
         T.torZ = 0.025 * Math.sin(p * 0.37);
-        boca = Math.sin(t * 5.3 * f + ph) * Math.sin(t * 1.3 + 0.7) > 0.12;
+        // la boca sigue un patrón de sílabas (rápido) modulado por frases (lento); nunca llega a abrirse del todo
+        X.boca = Math.max(0, Math.sin(t * 5.3 * f + ph) * (0.5 + 0.5 * Math.sin(t * 1.3 + 0.7))) * 0.85;
+        X.sonrisa = 0.5;
+        X.cejaIh = 0.1 + 0.35 * acento;
+        X.cejaDh = 0.1 + 0.35 * acento;
         break;
       }
       case 'walking': {
@@ -357,7 +334,12 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.cabZ = 0.07 * arriba;
         T.torZ = -0.05 * arriba; // se inclina levemente para compensar el peso del brazo
         T.torY = 0.06 * arriba;
-        boca = arriba > 0.9 && onda > 0.6;
+        X.sonrisa = 0.7 + 0.35 * arriba; // sonrisa amplia
+        X.cejaIh = 0.45 * arriba;
+        X.cejaDh = 0.45 * arriba;
+        X.ojo = 1 - 0.12 * arriba; // ojos levemente alegres
+        X.boca = arriba > 0.9 && onda > 0.5 ? 0.35 : 0;
+        X.miraX = 0;
         k = 8;
         break;
       }
@@ -370,6 +352,12 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
         T.cabX = 0.03 + asiente;
         T.torX = 0.05;
         T.torY = 0.1;
+        X.ojo = 1.08; // atento: ojos un poco más abiertos y cejas arriba
+        X.cejaIh = 0.4;
+        X.cejaDh = 0.55;
+        X.cejaIt = -0.15;
+        X.cejaDt = -0.2;
+        X.sonrisa = 0.35;
         T.torZ = 0.02;
         T.bDx = -0.12;
         T.bDa = 0.1;
@@ -406,7 +394,6 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
       }
     }
     salida.k = k;
-    salida.bocaAbierta = boca;
   }
 
   function aplicar(t) {
@@ -427,10 +414,11 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     bD.muneca.rotation.set(limitar(P.mD + rap.mD + arrD, ...LIM.muneca), limitar(P.rD, ...LIM.giro), 0);
     piernaI.rotation.x = limitar(P.pI, ...LIM.pierna);
     piernaD.rotation.x = limitar(P.pD, ...LIM.pierna);
-    // cara: parpadeo regular y boca abierta al hablar
+    // cara: parpadeo discreto (cierra y abre en ~0.18 s, solo los ojos) y la expresión continua
     const ciclo = t % v.parpadeo;
-    const mapa = texturaCara(ciclo > v.parpadeo - 0.14, salida.bocaAbierta);
-    if (matCara.map !== mapa) matCara.map = mapa;
+    const ini = v.parpadeo - 0.18;
+    const parpadeo = ciclo > ini ? Math.sin(((ciclo - ini) / 0.18) * Math.PI) : 0;
+    rostro.actualizar(E, parpadeo);
   }
 
   function animar(estado, t, dt) {
@@ -462,6 +450,16 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
       VEL[c] = (VEL[c] - om * tmp) * e;
       P[c] = T[c] + (cambio + tmp) * e;
     }
+    // la mirada se adelanta a la cabeza: los ojos van primero hacia el punto de interés y la cabeza los alcanza
+    X.miraX += limitar((T.cabY - P.cabY) * 1.1, -0.9, 0.9);
+    X.miraY += limitar((T.cabX - P.cabX) * 1.1, -0.6, 0.6);
+    X.miraX = limitar(X.miraX, -1, 1);
+    X.miraY = limitar(X.miraY, -1, 1);
+    // expresión: mezcla continua hacia la deseada (la boca responde más rápido que las cejas)
+    for (const c in X) {
+      const r = c === 'boca' ? 24 : c.startsWith('mira') ? 14 : 8;
+      E[c] += (X[c] - E[c]) * (1 - Math.exp(-dt * r));
+    }
     aplicar(t);
     if (estado === 'saludo' && tt >= DURACION.saludo && !terminado) {
       terminado = true;
@@ -474,7 +472,8 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     for (const c of CAMPOS) P[c] = VEL[c] = T[c] = 0;
     P.bIa = P.bDa = 0.07;
     rap.mI = rap.mD = 0;
-    salida.bocaAbierta = false;
+    Object.assign(X, BASE_X);
+    Object.assign(E, BASE_X);
     aplicar(0);
   }
   reposo();
@@ -498,7 +497,7 @@ function minifigura({ camisa = PALETA.naranja, piel = '#f5cd30', pantalon = '#3b
     };
   }
 
-  return { objeto: raiz, animar, reposo, mirarA, manoDer: bD.muneca, diagnostico };
+  return { objeto: raiz, animar, reposo, mirarA, manoDer: bD.muneca, diagnostico, expresion: () => ({ ...E }) };
 }
 
 registrarModelo('minifigura', minifigura);
