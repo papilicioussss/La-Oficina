@@ -11,7 +11,7 @@ Oficina virtual isométrica con **3 agentes de IA** que te ayudan con el conteni
 | 🐱 Tu gato asistente | Mascota y memoria | Un gato amarillo que vive en tu oficina. Conversas con él y guarda (o corrige) precios, destinos, identidad de la marca en redes, público y operación; los tres agentes leen esa memoria. |
 | 👑 Tu oficina | Tú (el jefe) | Tu avatar: camina hasta el agente que tocas para consultarle y preside las reuniones desde la cabecera. |
 
-Por defecto se llaman **Nico** (copy, naranja), **Alex** (analista, azul) y **Sam** (guionista, violeta); los renombras en Configuración → Equipo. Cada uno tiene su ropa, accesorios y animaciones según lo que está haciendo (reposo, pensando, buscando, en reunión y un gesto corto al terminar). La oficina y los personajes tienen estética de bloques tipo LEGO.
+Por defecto se llaman **Nico** (copy, naranja), **Alex** (analista, azul) y **Sam** (guionista, violeta); los renombras en Configuración → Equipo. Cada uno tiene su ropa, accesorios y animaciones según lo que está haciendo (reposo, pensando, buscando, en reunión y un gesto corto al terminar). La oficina y los personajes tienen estética de bloques tipo LEGO (taquitos, ladrillos, piso de baseplate, sombras suaves). Al tocar un agente la cámara se acerca a su sala (se apaga con movimiento reducido o en pantallas pequeñas). Las animaciones reflejan estados reales: pensando, buscando, escribiendo (solo cuando llega texto), en reunión, y un gesto corto al terminar una respuesta que salió bien.
 
 La app **no hace** documentos, edición de video, flyers ni identidad visual: solo texto, guiones y análisis.
 
@@ -115,9 +115,13 @@ Estructura:
 
 ```
 index.html            página principal
-css/styles.css        estilos (claro y oscuro)
+css/tokens.css        tokens de diseño (tipografía, espaciado, radios, sombras, movimiento, colores claro/oscuro)
+css/styles.css        estilos de la interfaz 2D (usa los tokens)
+css/office.css        estilos y animaciones de la escena isométrica
+css/meeting.css       tira de participantes de la sala de juntas
 js/app.js             arranque y navegación (#/agente/copy, #/juntas, #/config…)
-js/office.js          oficina isométrica en SVG y animaciones de los personajes
+js/office.js          oficina isométrica en SVG, personajes, cámara y animaciones
+js/lego.js            materiales LEGO de la escena (plásticos, taquitos, ladrillos, baseplate, sombras)
 js/prompts.js         roles e instrucciones de cada agente
 js/brain.js           llamadas a Gemini, búsqueda web y sala de juntas
 js/gemini.js          cliente de la API de Gemini (streaming)

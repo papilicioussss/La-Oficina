@@ -6,7 +6,7 @@ import { runtime, on, emit, go } from './state.js';
 import { runCat, undoSaved } from './cat-brain.js';
 import { md, toPlain } from './markdown.js';
 import { catHeadSvg } from './cat-sprite.js';
-import { bossName } from './prompts.js';
+import { bossName, agentName } from './prompts.js';
 import { facts, catLabel, gaps } from './memory.js';
 import { SetupError } from './brain.js';
 import { tierBadge } from './chat.js';
@@ -41,7 +41,7 @@ function welcomeText(name) {
   const first = g
     ? `Para empezar: cuéntame ${g.ask}. Puedes escribírmelo todo de una vez, como te salga, y yo lo ordeno. 🐾`
     : 'Ya tengo bastante anotado. Cuéntame qué hay de nuevo.';
-  return `*ronronea* ¡${name}! Me gusta, me queda perfecto. 😺\n\nSoy tu gato asistente, ${bossName()}: me encargo de la memoria de la marca. Lo que me cuentes (precios, destinos, cómo se ve la marca en redes, quién te compra) lo guardo, y Copy, el Analista y el Guionista lo usan para trabajar con datos reales y no inventar.\n\n${first}`;
+  return `*ronronea* ¡${name}! Me gusta, me queda perfecto. 😺\n\nSoy tu gato asistente, ${bossName()}: me encargo de la memoria de la marca. Lo que me cuentes (precios, destinos, cómo se ve la marca en redes, quién te compra) lo guardo, y ${agentName('copy')}, ${agentName('analista')} y ${agentName('guion')} lo usan para trabajar con datos reales y no inventar.\n\n${first}`;
 }
 
 function savedChips(m) {
@@ -226,7 +226,7 @@ function nameCard(panel) {
       h(
         'p',
         null,
-        `Soy tu gato asistente y la mascota de la oficina. Voy a guardar todo lo que me cuentes de la marca (precios, destinos, tu público…) para que Copy, el Analista y el Guionista trabajen con datos reales. Pero primero… ¿cómo quieres llamarme?`
+        `Soy tu gato asistente y la mascota de la oficina. Voy a guardar todo lo que me cuentes de la marca (precios, destinos, tu público…) para que ${agentName('copy')}, ${agentName('analista')} y ${agentName('guion')} trabajen con datos reales. Pero primero… ¿cómo quieres llamarme?`
       ),
       h('div', { class: 'field' }, h('label', null, 'Nombre de tu gato'), h('div', { class: 'key-row' }, input, h('button', { class: 'btn btn-primary', type: 'button', onClick: save }, 'Listo'))),
       h(

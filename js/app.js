@@ -110,9 +110,14 @@ function announceStatus({ id, status }) {
   prevStatus[id] = status;
   const name = store.agents()[id]?.name;
   if (!name || before === status) return;
-  if (status === 'thinking') announce(`${name} está pensando…`);
-  else if (status === 'searching') announce(`${name} está buscando en la web…`);
-  else if ((before === 'thinking' || before === 'searching') && (status === 'idle' || status === 'meeting')) announce(`${name} terminó.`);
+  if (status === 'thinking') {
+    if (before !== 'searching') announce(`${name} está pensando…`);
+  } else if (status === 'searching') announce(`${name} está buscando en la web…`);
+  else if ((before === 'thinking' || before === 'searching') && (status === 'idle' || status === 'meeting')) {
+    const last = store.chat(id).at(-1);
+    const failed = status === 'idle' && (!last || last.role !== 'model' || last.error || !last.text);
+    announce(failed ? `${name} no pudo responder.` : `${name} terminó.`);
+  }
 }
 
 function route() {

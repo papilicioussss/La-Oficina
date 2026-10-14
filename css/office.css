@@ -52,6 +52,10 @@
 .agent .body-bob {
   animation: bob 3.4s ease-in-out infinite;
 }
+/* En reposo el cuerpo no se mueve de forma permanente: la vida la dan los gestos de cada agente y el parpadeo */
+.agent[data-status='idle']:not(.walking):not(.done) .body-bob {
+  animation: none;
+}
 .agent[data-agent='analista'] .body-bob {
   animation-delay: -1.1s;
 }
@@ -229,9 +233,8 @@
 .agent[data-agent='analista'].is-working .chart-bar {
   transform-origin: 50% 100%;
   animation: bar-grow 1.1s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i, 0) * -0.35s);
 }
-.agent[data-agent='analista'].is-working .chart-bar:nth-of-type(2) { animation-delay: -0.35s; }
-.agent[data-agent='analista'].is-working .chart-bar:nth-of-type(3) { animation-delay: -0.7s; }
 @keyframes bar-grow {
   from { transform: scaleY(0.45); }
   to { transform: scaleY(1.15); }
@@ -348,8 +351,12 @@
 .agent .bubble-text {
   fill: #1d2433;
 }
-.agent.walking .bubble {
+.agent.walking .bubble,
+.agent[data-status='meeting'] .bubble {
   opacity: 0;
+}
+.office-svg text {
+  text-rendering: geometricPrecision;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -398,12 +405,7 @@
 }
 .analista-working .wall-bar {
   animation: wall-bar 1.6s ease-in-out infinite alternate;
-}
-.analista-working .wall-bar:nth-of-type(2n) {
-  animation-delay: -0.5s;
-}
-.analista-working .wall-bar:nth-of-type(3n) {
-  animation-delay: -1s;
+  animation-delay: calc(var(--i, 0) * -0.5s);
 }
 @keyframes wall-bar {
   from { transform: scaleY(0.82); }
@@ -411,4 +413,20 @@
 }
 .agent .gloss {
   pointer-events: none;
+}
+
+/* Zzz del gato: un ciclo largo con una pausa quieta (sin repintado) en lugar de moverse sin parar */
+.zzz {
+  animation: zfloat-slow 9s infinite;
+}
+.zzz.z2 {
+  animation-delay: 0.8s;
+}
+.zzz.z3 {
+  animation-delay: 1.6s;
+}
+@keyframes zfloat-slow {
+  0% { opacity: 0; transform: translateY(4px); }
+  12% { opacity: 1; }
+  36%, 100% { opacity: 0; transform: translateY(-5px); }
 }

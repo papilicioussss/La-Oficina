@@ -70,10 +70,8 @@ function initStaticDefs() {
     s(
       'g',
       { id: 'lg-stud' },
-      s('rect', { x: -2.5, y: 0, width: 5, height: 1.6, fill: 'currentColor' }),
-      s('rect', { x: -2.5, y: 0, width: 5, height: 1.6, fill: '#000', opacity: 0.2 }),
-      s('ellipse', { cx: 0, cy: 1.6, rx: 2.5, ry: 1.25, fill: 'currentColor' }),
-      s('ellipse', { cx: 0, cy: 1.6, rx: 2.5, ry: 1.25, fill: '#000', opacity: 0.2 }),
+      s('path', { d: 'M-2.5 0v1.6a2.5 1.25 0 0 0 5 0V0z', fill: 'currentColor' }),
+      s('path', { d: 'M-2.5 0v1.6a2.5 1.25 0 0 0 5 0V0z', fill: '#000', opacity: 0.2 }),
       s('ellipse', { cx: 0, cy: 0, rx: 2.5, ry: 1.25, fill: 'currentColor' }),
       s('ellipse', { cx: -0.8, cy: -0.35, rx: 0.9, ry: 0.4, fill: '#fff', opacity: 0.45 })
     )

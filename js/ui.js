@@ -7,7 +7,7 @@ function applyProps(el, props, isSvg) {
   for (const [k, v] of Object.entries(props)) {
     if (v == null || v === false) continue;
     if (k === 'class') isSvg ? el.setAttribute('class', v) : (el.className = v);
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') for (const [p, val] of Object.entries(v)) p.startsWith('--') ? el.style.setProperty(p, val) : (el.style[p] = val);
     else if (k === 'dataset') Object.assign(el.dataset, v);
     else if (k === 'text') el.textContent = v;
     else if (k === 'html') el.innerHTML = v; // solo con HTML ya sanitizado (markdown.js)

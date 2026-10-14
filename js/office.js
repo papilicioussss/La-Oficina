@@ -120,7 +120,7 @@ function plateY(x1, x2, y, z1, z2, color, text, ink) {
     s(
       'g',
       { transform: `${planeY(x1, y + 0.02, z1)} scale(1 -1)` },
-      s('text', { x: (x2 - x1) / 2, y: -(z2 - z1) * 0.28, 'text-anchor': 'middle', 'font-size': (z2 - z1) * 0.58, 'font-weight': 700, fill: ink }, text)
+      s('text', { x: (x2 - x1) / 2, y: -(z2 - z1) * 0.28, 'text-anchor': 'middle', 'font-size': Math.min((z2 - z1) * 0.58, ((x2 - x1) * 0.9) / (Math.max(text.length, 1) * 0.6)), 'font-weight': 700, fill: ink }, text)
     )
   );
 }
@@ -203,7 +203,7 @@ function staticScene() {
   g.append(box(12, 24, -0.7, 12, 10, 0.7, SLAB, {}, { seam: 0.35, studs: false }));
   // Pisos de cada sala (clicables)
   for (const [room, [ox, oy, w, d]] of Object.entries(ROOM_AREA)) {
-    const label = room === 'juntas' ? 'Sala de juntas' : room === 'kike' ? 'Tu oficina' : `${ROLES[room].room}`;
+    const label = room === 'juntas' ? 'Sala de juntas' : room === 'kike' ? 'Tu oficina' : `Oficina de ${nameOf(room)}`;
     const poly = s('polygon', {
       class: 'room-floor',
       'data-room': room,
@@ -285,7 +285,7 @@ function staticScene() {
   const barColors = ['#22b8c4', '#ff8a6b', '#ffcc4d'];
   bars.forEach((hgt, i) => {
     const x1 = 14.5 + i * 1.08;
-    walls.append(s('polygon', { class: 'wall-bar', points: quadY(x1, x1 + 0.6, 2.55, 2.55 + hgt, 0.03), fill: barColors[i % 3] }));
+    walls.append(s('polygon', { class: 'wall-bar', style: { '--i': i % 3 }, points: quadY(x1, x1 + 0.6, 2.55, 2.55 + hgt, 0.03), fill: barColors[i % 3] }));
   });
   const trend = [0, 1, 2, 3, 4, 5].map((i) => iso(14.8 + i * 1.08, 0.03, 3.6 + bars[i] * 0.55));
   walls.append(
@@ -578,9 +578,9 @@ function kitParts(look) {
         { class: 'acc-tablet', transform: 'translate(-14.5,-15)' },
         s('rect', { x: -4.4, y: -6.2, width: 8.8, height: 12, rx: 1.4, fill: INK }),
         s('rect', { x: -3.4, y: -5, width: 6.8, height: 9.6, rx: 0.6, fill: '#d6edf8' }),
-        s('rect', { class: 'chart-bar', x: -2.6, y: -0.6, width: 1.5, height: 4, fill: '#ff8a3d' }),
-        s('rect', { class: 'chart-bar', x: -0.7, y: -2.6, width: 1.5, height: 6, fill: '#0078ab' }),
-        s('rect', { class: 'chart-bar', x: 1.2, y: -1.6, width: 1.5, height: 5, fill: '#30bb4f' })
+        s('rect', { class: 'chart-bar', style: { '--i': 0 }, x: -2.6, y: -0.6, width: 1.5, height: 4, fill: '#ff8a3d' }),
+        s('rect', { class: 'chart-bar', style: { '--i': 1 }, x: -0.7, y: -2.6, width: 1.5, height: 6, fill: '#0078ab' }),
+        s('rect', { class: 'chart-bar', style: { '--i': 2 }, x: 1.2, y: -1.6, width: 1.5, height: 5, fill: '#30bb4f' })
       )
     );
     out.fx.push(
@@ -925,6 +925,7 @@ export function renderOffice(container) {
 
   host.replaceChildren(svg);
   svgRoot = svg;
+  svg.classList.toggle('analista-working', runtime.status.analista === 'thinking' || runtime.status.analista === 'searching');
   applyMotionPref();
   setActiveRoom(activeRoom);
 }
@@ -932,8 +933,31 @@ export function renderOffice(container) {
 /** Pausa también las animaciones SMIL (el gato) cuando el sistema pide movimiento reducido. */
 function applyMotionPref() {
   if (!svgRoot) return;
-  if (reduceMotion()) svgRoot.pauseAnimations?.();
-  else svgRoot.unpauseAnimations?.();
+  catMotion(cat.pose);
+}
+
+// Las animaciones SMIL del gato (patas, rabo, respiración) obligan a repintar toda la escena en cada cuadro:
+// solo corren continuamente mientras camina; en reposo el rabo se mueve en ráfagas cortas.
+let smilTimer = 0;
+function catMotion(pose) {
+  clearTimeout(smilTimer);
+  if (!svgRoot) return;
+  if (reduceMotion()) {
+    svgRoot.pauseAnimations?.();
+    return;
+  }
+  if (pose === 'walk') {
+    svgRoot.unpauseAnimations?.();
+    return;
+  }
+  const burst = () => {
+    svgRoot?.unpauseAnimations?.();
+    smilTimer = setTimeout(() => {
+      svgRoot?.pauseAnimations?.();
+      smilTimer = setTimeout(burst, 6000 + Math.random() * 5000);
+    }, 2400);
+  };
+  burst();
 }
 
 // ---------- Cámara: acercamiento suave a la sala seleccionada (solo escritorio; se apaga con movimiento reducido) ----------
@@ -1494,6 +1518,7 @@ function setCatPos(x, y, z = 0, lift = 0) {
 function setCatPose(pose) {
   cat.pose = pose;
   cat.sprite?.setPose(pose);
+  catMotion(pose);
 }
 
 function catFace(dx, dy) {
@@ -1719,7 +1744,10 @@ export function mountOffice(container) {
   on('status', ({ id, status }) => {
     const el = charEls[id];
     if (!el) return;
-    if (status === 'thinking') lastLen[id] = 0;
+    if (status === 'thinking') {
+      const l = store.chat(id).at(-1);
+      lastLen[id] = l?.role === 'model' ? l.text?.length || 0 : 0;
+    }
     if (status !== 'thinking') el.classList.remove('is-typing');
     updateBubble(el, id);
     // gesto corto al terminar de trabajar (solo visual): si fue una respuesta, solo cuando salió bien
@@ -1752,7 +1780,12 @@ export function mountOffice(container) {
     lastLen[agentId] = len;
   });
   on('agents-changed', () => renderOffice());
-  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', applyMotionPref);
+  const recam = () => {
+    applyMotionPref();
+    setCamera(activeRoom);
+  };
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', recam);
+  window.matchMedia('(max-width: 900px)').addEventListener?.('change', recam);
   catStart();
 }
 

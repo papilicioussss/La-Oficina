@@ -1943,7 +1943,7 @@ textarea {
     min-height: var(--tap);
   }
   .seg button {
-    min-height: 40px;
+    min-height: var(--tap);
   }
   .filters select,
   .check input {
@@ -1957,6 +1957,18 @@ textarea {
   .swatch {
     width: 36px;
     height: 36px;
+    position: relative;
+  }
+  .swatch::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+  .check,
+  summary {
+    min-height: var(--tap);
+    display: flex;
+    align-items: center;
   }
   .link-btn {
     min-height: var(--tap);
@@ -1979,7 +1991,7 @@ textarea {
     inset: -12px;
   }
   .checklist .link-btn {
-    min-height: 32px;
+    min-height: var(--tap);
   }
 }
 
@@ -2015,7 +2027,7 @@ textarea {
     gap: var(--space-2);
   }
   .dock-btn {
-    min-height: 36px;
+    min-height: var(--tap);
   }
   .dock-btn .avatar,
   .dock-btn .dock-icon {
