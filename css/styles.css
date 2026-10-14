@@ -2049,6 +2049,15 @@ textarea {
   .panel.is-sheet .only-sheet {
     display: inline-grid;
   }
+  /* Inicio en el teléfono: el panel crece con su contenido y la página es la que se desliza.
+     Sin esto, la caja con scroll propio del panel atrapaba el dedo y no dejaba deslizar sobre las tarjetas. */
+  .panel:not(.is-sheet) {
+    overflow: visible;
+  }
+  .panel:not(.is-sheet) .panel-body {
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
   body.sheet-open {
     overflow: hidden;
   }
