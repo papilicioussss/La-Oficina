@@ -132,13 +132,54 @@ $('girar').addEventListener('click', (e) => {
   controles.autoRotate = !controles.autoRotate;
   e.currentTarget.setAttribute('aria-pressed', controles.autoRotate);
 });
-const estados = ['idle', 'thinking', 'searching', 'talking', 'walking'];
-let estadoDemo = 0;
-$('estado').addEventListener('click', (e) => {
-  estadoDemo = (estadoDemo + 1) % estados.length;
-  modelos.forEach((m) => (m.estado = estados[(estadoDemo + (m === modelos[0] ? 0 : 3)) % estados.length]));
-  e.currentTarget.textContent = `Animación de prueba: ${estados[estadoDemo]}`;
+// ---------- Animaciones de prueba ----------
+// Nico recibe la animación elegida y Alex reacciona de forma coherente (escucha cuando Nico habla, devuelve el saludo...).
+const NOMBRES = { idle: 'reposo', saludo: 'saludo', escucha: 'escucha atenta', talking: 'hablando', thinking: 'pensando', searching: 'buscando', walking: 'caminando' };
+const ORDEN = Object.keys(NOMBRES);
+const [nico, alex] = modelos;
+const posCabeza = (m) => m.objeto.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 3.3, 0));
+mundo.updateMatrixWorld(true);
+let temporizadores = [];
+function aplicarAnimacion(clave) {
+  temporizadores.forEach(clearTimeout);
+  temporizadores = [];
+  const reaccion = { talking: 'escucha', escucha: 'talking', saludo: 'saludo' }[clave] || 'idle';
+  nico.estado = clave;
+  // Alex responde un instante después (si no, los dos se moverían exactamente a la vez)
+  temporizadores.push(setTimeout(() => (alex.estado = reaccion), reaccion === 'idle' ? 0 : clave === 'saludo' ? 1100 : 500));
+  const mira = ['talking', 'escucha', 'saludo'].includes(clave);
+  nico.mirarA(mira ? posCabeza(alex) : null);
+  alex.mirarA(mira && reaccion !== 'idle' ? posCabeza(nico) : null);
+  $('animacion').value = clave;
+  $('estado').textContent = `Animación de prueba: ${NOMBRES[clave]}`;
+}
+$('animacion').addEventListener('change', (e) => aplicarAnimacion(e.target.value));
+$('estado').addEventListener('click', () => aplicarAnimacion(ORDEN[(ORDEN.indexOf($('animacion').value) + 1) % ORDEN.length]));
+$('reposo').addEventListener('click', () => aplicarAnimacion('idle'));
+
+// ---------- Cámara hacia las manos ----------
+let tween = null;
+function volarA(posicion, objetivo, ms = 900) {
+  tween = { desde: camara.position.clone(), hasta: posicion, tDesde: controles.target.clone(), tHasta: objetivo, ini: performance.now(), ms };
+}
+$('manos').addEventListener('click', () => {
+  // la mano derecha de Nico, vista un poco desde arriba y de frente
+  const m = nico.manoDer.getWorldPosition(new THREE.Vector3());
+  aplicarAnimacion('talking'); // la mano se mueve al hablar, así se ve su forma desde varios ángulos
+  const dir = new THREE.Vector3(0.6, 0.35, 1).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+  volarA(m.clone().addScaledVector(dir, 5.2), m, 900);
 });
+function pasoTween(ahora) {
+  if (!tween) return;
+  const k = Math.min(1, (ahora - tween.ini) / tween.ms);
+  const e = k * k * (3 - 2 * k);
+  camara.position.lerpVectors(tween.desde, tween.hasta, e);
+  controles.target.lerpVectors(tween.tDesde, tween.tHasta, e);
+  if (k >= 1) tween = null;
+}
+// cualquier gesto del usuario sobre la cámara cancela el vuelo automático
+lienzo.addEventListener('pointerdown', () => (tween = null));
+lienzo.addEventListener('wheel', () => (tween = null), { passive: true });
 
 // ---------- Medidor de rendimiento y bajada automática de calidad ----------
 const medida = {
@@ -171,16 +212,27 @@ const medida = {
 };
 
 // ---------- Bucle ----------
+const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reducido) modelos.forEach((m) => m.reposo());
+const pruebas = { pausa: false }; // solo para pruebas automáticas
 let ultimo = performance.now();
 let tiempo = 0;
-const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function bucle(ahora) {
   const dt = Math.min(0.1, (ahora - ultimo) / 1000);
   ultimo = ahora;
   tiempo += dt;
   const t = tiempo;
-  if (!reducido) modelos.forEach((m) => m.animar(m.estado, t, dt));
-  else modelos.forEach((m) => m.animar('idle', 0, 0));
+  if (!reducido && !pruebas.pausa) {
+    for (const m of modelos) {
+      // una animación de una sola vez (saludo) avisa cuando termina y el personaje vuelve al reposo
+      if (m.animar(m.estado, t, dt) && m.estado === 'saludo') {
+        m.estado = 'idle';
+        m.mirarA(null);
+        if (m === nico) aplicarAnimacion('idle');
+      }
+    }
+  }
+  pasoTween(ahora);
   controles.update();
   renderer.render(escena, camara);
   medida.tick(ahora);
@@ -191,4 +243,14 @@ $('resumen').textContent = `${cajas} ladrillos en la escena`;
 document.body.dataset.listo = '1';
 
 // gancho solo para pruebas automáticas
-window.__prueba3d = { renderer, escena, camara, controles, modelos };
+window.__prueba3d = {
+  renderer, escena, camara, controles, modelos, aplicarAnimacion,
+  // avanza la animación 'seg' segundos de golpe (el navegador de pruebas dibuja muy lento por software)
+  avanzar(seg) {
+    pruebas.pausa = true;
+    for (let s = 0; s < seg; s += 0.04) {
+      tiempo += 0.04;
+      for (const m of modelos) if (m.animar(m.estado, tiempo, 0.04) && m.estado === 'saludo') m.estado = 'idle';
+    }
+  },
+};

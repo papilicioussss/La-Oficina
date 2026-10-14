@@ -68,17 +68,17 @@ export function construirEscena() {
   mundo.add(hojas);
 
   // minifiguras: se piden al registro de modelos (hoy son provisionales hechas por código; mañana pueden ser modelos detallados)
-  const nico = crearModelo('minifigura', { camisa: PALETA.naranja, gorra: PALETA.naranja });
+  const nico = crearModelo('minifigura', { camisa: PALETA.naranja, gorra: PALETA.naranja, semilla: 3 });
   nico.objeto.position.set(dx - 1.6, 0.4, dz + 1.5);
   nico.objeto.scale.setScalar(0.85);
   nico.objeto.rotation.y = Math.PI / 2; // mira al escritorio
   mundo.add(nico.objeto);
-  const alex = crearModelo('minifigura', { camisa: PALETA.azul, pantalon: '#2b2f3a' });
+  const alex = crearModelo('minifigura', { camisa: PALETA.azul, pantalon: '#2b2f3a', semilla: 11 });
   alex.objeto.position.set(9.5, 0.4, 12.5);
   alex.objeto.scale.setScalar(0.85);
   alex.objeto.rotation.y = -0.7;
   mundo.add(alex.objeto);
 
   mundo.position.set(-N / 2, 0, -N / 2); // centrado en el origen
-  return { mundo, modelos: [{ ...nico, estado: 'thinking' }, { ...alex, estado: 'idle' }], tamano: N, cajas: k.cajas };
+  return { mundo, modelos: [{ ...nico, nombre: 'Nico', estado: 'idle' }, { ...alex, nombre: 'Alex', estado: 'idle' }], tamano: N, cajas: k.cajas };
 }
