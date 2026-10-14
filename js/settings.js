@@ -303,7 +303,7 @@ function keysTab() {
       )
     ),
     provider,
-    h('div', { style: { height: '14px' } }),
+    h('div', { class: 'gap-4' }),
     field(
       'API key de Tavily',
       h('div', { class: 'key-row' }, t.input, t.eye, tTest),
@@ -312,10 +312,10 @@ function keysTab() {
     h(
       'details',
       null,
-      h('summary', { style: { cursor: 'pointer', fontWeight: 800 } }, 'Avanzado: proxy de Tavily'),
+      h('summary', { class: 'fw-semibold' }, 'Avanzado: proxy de Tavily'),
       h(
         'div',
-        { style: { marginTop: '10px' } },
+        { class: 'mt-3' },
         field(
           'URL del proxy (opcional)',
           proxy,
@@ -540,11 +540,11 @@ function catCard() {
   const c = store.cat();
   return h(
     'section',
-    { class: 'team-card', style: { borderColor: '#fde07e' } },
+    { class: 'team-card team-card-cat' },
     h(
       'div',
       { class: 'team-card-head' },
-      h('div', { class: 'avatar-lg', style: { background: '#fde07e' } }, catHeadSvg('avatar-lg')),
+      h('div', { class: 'avatar-lg avatar-cat' }, catHeadSvg('avatar-lg')),
       h('div', null, h('strong', null, '🐱 Tu gato asistente'), h('div', { class: 'hint' }, 'Mascota de la oficina y memoria de la marca. Toca al gato en la oficina para hablar con él.'))
     ),
     field(
@@ -707,11 +707,11 @@ function memoryTab() {
         'div',
         { class: 'team-card' },
         h('strong', null, '➕ Agregar un dato'),
-        h('div', { style: { height: '8px' } }),
+        h('div', { class: 'gap-2' }),
         catSel,
-        h('div', { style: { height: '8px' } }),
+        h('div', { class: 'gap-2' }),
         text,
-        h('div', { style: { height: '8px' } }),
+        h('div', { class: 'gap-2' }),
         h(
           'button',
           {
@@ -780,7 +780,7 @@ function skillsTab() {
           h(
             'div',
             { class: 'skill-head' },
-            h('span', { style: { fontSize: '20px' } }, sk.icon),
+            h('span', { class: 'skill-icon' }, sk.icon),
             h('div', { class: 'grow' }, h('strong', null, sk.name, sk.core ? h('small', null, ' · básica, siempre activa') : null), h('small', null, sk.desc)),
             sk.custom
               ? h(
@@ -834,7 +834,7 @@ function skillsTab() {
                   'Siempre (gasta más tokens)'
                 )
               ),
-          h('details', null, h('summary', { style: { cursor: 'pointer', fontWeight: 800 } }, 'Ver instrucciones'), h('pre', null, sk.text))
+          h('details', null, h('summary', { class: 'fw-semibold' }, 'Ver instrucciones'), h('pre', null, sk.text))
         );
         nodes.push(card);
       }
@@ -1070,7 +1070,7 @@ export function renderSettings(panel, tab = 'claves') {
     'header',
     { class: 'panel-head' },
     h('button', { class: 'icon-btn back-btn only-sheet', type: 'button', 'aria-label': 'Volver a la oficina', onClick: () => go('#/') }, '←'),
-    h('span', { class: 'avatar', style: { display: 'grid', placeItems: 'center', fontSize: '20px' } }, '⚙️'),
+    h('span', { class: 'avatar avatar-icon' }, '⚙️'),
     h('div', { class: 'panel-title' }, h('strong', null, 'Configuración'), h('span', null, 'Claves, equipo, marca y datos'))
   );
   const tabs = h(

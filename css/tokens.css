@@ -80,13 +80,6 @@
   --agent-analista: #008ec7;
   --agent-guion: #7a5af8;
   --agent-boss: #e7b84a;
-
-  /* Alias heredados: usar --brand-orange / --brand-orange-2 en código nuevo */
-  --coral: var(--brand-orange);
-  --sun: var(--brand-orange-2);
-  --cta-grad: var(--cta-bg);
-  --shadow: var(--shadow-1);
-  --radius-md: var(--radius);
 }
 
 :root {
@@ -203,4 +196,39 @@
   --series-tt: #d95926;
   --tip-bg: #f5f5f7;
   --tip-ink: #1d2433;
+}
+
+/* ---------- Tokens añadidos en la Etapa B (sistema de diseño de la interfaz 2D) ---------- */
+
+:root {
+  /* Zonas seguras (notch / barra de gestos) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --topbar-total: calc(var(--topbar-h) + var(--safe-top));
+  --inset-l: max(var(--space-4), var(--safe-left));
+  --inset-r: max(var(--space-4), var(--safe-right));
+
+  /* Sobre superficies tintadas (scrim oscuro fijo, p. ej. botón de quitar adjunto) */
+  --scrim-strong: rgba(0, 0, 0, 0.6);
+  --on-scrim: #ffffff;
+
+  /* La escena SVG tiene su propio papel y tinta, independientes del tema */
+  --scene-ink: #1a2433;
+  --scene-paper: #ffffff;
+  --scene-line: #d4d4da;
+
+  /* Texto atenuado sobre superficies tintadas (surface-2 / surface-3), ≥ 4.5:1 */
+  --muted-strong: #5b5b63;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --muted-strong: #acacb3;
+  }
+}
+
+:root[data-theme='dark'] {
+  --muted-strong: #acacb3;
 }

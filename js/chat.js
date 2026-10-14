@@ -131,12 +131,12 @@ function introEl(agentId) {
     'div',
     { class: 'msg msg-model msg-intro' },
     h('div', { class: 'msg-head' }, avatarSvg(a.look), a.name),
-    h('p', { style: { margin: 0 } }, `¡Epa, Kike! Soy ${a.name}, tu ${role.title.toLowerCase()}. ${role.short} ¿Qué hacemos hoy?`),
+    h('p', { class: 'm-0' }, `¡Epa, Kike! Soy ${a.name}, tu ${role.title.toLowerCase()}. ${role.short} ¿Qué hacemos hoy?`),
     hasKey
       ? null
       : h(
           'p',
-          { style: { margin: '8px 0 0' } },
+          { class: 'mt-2 mb-0' },
           '⚠️ Primero necesito tu API key de Google AI Studio. ',
           h('button', { class: 'link-btn', type: 'button', onClick: () => go('#/config/claves') }, 'Agregarla aquí')
         )
@@ -292,7 +292,7 @@ function chatView(agentId) {
     const body = h(
       'div',
       null,
-      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Se activan solas según lo que escribas. Marca las que quieras que use sí o sí en tu próximo mensaje (máximo 4).'),
+      h('p', { class: 'hint mt-0' }, 'Se activan solas según lo que escribas. Marca las que quieras que use sí o sí en tu próximo mensaje (máximo 4).'),
       h(
         'div',
         { class: 'radio-cards' },

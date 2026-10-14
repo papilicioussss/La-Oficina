@@ -41,6 +41,17 @@ export function s(tag, props, ...kids) {
   return el;
 }
 
+/** Icono de línea (20px, trazo 1.75, currentColor) para botones. Decorativo: el texto accesible va en el botón. */
+const ICONS = { close: ['M18 6 6 18', 'M6 6l12 12'] };
+
+export function icon(name) {
+  return s(
+    'svg',
+    { class: 'icon', width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.75, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' },
+    ICONS[name].map((d) => s('path', { d }))
+  );
+}
+
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -139,7 +150,7 @@ export function openModal({ title, body, actions = [], wide = false, onClose }) 
         'header',
         { class: 'modal-head' },
         h('h2', null, title),
-        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Cerrar', onClick: close }, '✕')
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Cerrar', onClick: close }, icon('close'))
       ),
       h('div', { class: 'modal-body' }, body),
       actions.length
@@ -187,7 +198,7 @@ export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    const ta = h('textarea', { style: { position: 'fixed', opacity: '0' } });
+    const ta = h('textarea', { class: 'clip-fallback' });
     ta.value = text;
     document.body.append(ta);
     ta.select();

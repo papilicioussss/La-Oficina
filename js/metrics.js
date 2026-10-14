@@ -169,7 +169,7 @@ function postForm(existing, onSaved) {
     null,
     h(
       'div',
-      { class: 'note', style: { marginBottom: '14px' } },
+      { class: 'note mb-4' },
       'Copia los números de Instagram Insights o TikTok Analytics. También puedes subir una captura y la IA los lee por ti. ',
       shotBtn,
       shotInput
@@ -296,7 +296,7 @@ export function renderMetrics(container) {
       `🤖 Analizar con ${agents.analista.name}`
     );
 
-    const nodes = [h('div', { class: 'filters' }, seg, period, h('span', { style: { flex: 1 } }), addBtn, analyzeBtn)];
+    const nodes = [h('div', { class: 'filters' }, seg, period, h('span', { class: 'spacer' }), addBtn, analyzeBtn)];
 
     if (!all.length) {
       nodes.push(

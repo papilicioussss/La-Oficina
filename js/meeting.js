@@ -3,7 +3,7 @@
 import { h, toast, copyText, uid, fmtDate, confirmDialog } from './ui.js';
 import * as store from './store.js';
 import { AGENT_IDS } from './store.js';
-import { runtime, on, emit, go, setStatus } from './state.js';
+import { runtime, on, emit, go, setStatus, STATUS_LABEL } from './state.js';
 import { research, meetingTurn, meetingPlan, searchProvider } from './brain.js';
 import { md, toPlain } from './markdown.js';
 import { ROLES, agentName, bossName } from './prompts.js';
@@ -186,13 +186,14 @@ function endMeeting(m) {
 
 // ---------------- Vistas ----------------
 
-function header(title, subtitle) {
+function header(title, subtitle, bar) {
   return h(
     'header',
-    { class: 'panel-head' },
+    { class: `panel-head${bar ? ' meet-head' : ''}` },
     h('button', { class: 'icon-btn back-btn only-sheet', type: 'button', 'aria-label': 'Volver a la oficina', onClick: () => go('#/') }, '←'),
     h('span', { class: 'avatar', style: { display: 'grid', placeItems: 'center', fontSize: '20px' } }, '🤝'),
-    h('div', { class: 'panel-title' }, h('strong', null, title), h('span', null, subtitle))
+    h('div', { class: 'panel-title' }, h('strong', null, title), h('span', null, subtitle)),
+    bar || null
   );
 }
 
@@ -370,6 +371,7 @@ function turnEl(m, t) {
     else {
       if (t.queries?.length) el.append(h('div', { class: 'chips', style: { marginBottom: '6px' } }, t.queries.map((q) => h('span', { class: 'chip' }, '🔎 ', q))));
       if (t.provider === 'google' && t.digest) el.append(h('div', { class: 'md', html: md(t.digest) }));
+      else if (t.provider === 'tavily' && t.digest && t.sources?.length) el.append(digestEl(t.digest));
       el.append(sourcesEl(t.sources) || h('p', { class: 'hint' }, 'Sin fuentes encontradas.'));
     }
     return el;
@@ -382,6 +384,12 @@ function turnEl(m, t) {
   else if (t.pending) el.append(h('div', { class: 'typing' }, h('i'), h('i'), h('i')));
   if (t.error) el.append(h('p', null, '⚠️ ', t.error));
   return el;
+}
+
+// Con Tavily el "digest" son los extractos de cada fuente (los mismos que lee el equipo).
+function digestEl(digest) {
+  const lines = String(digest).split('\n').filter((l) => l.trim());
+  return h('details', { class: 'sources research-digest' }, h('summary', null, `🧾 Extractos de la investigación (${lines.length})`), h('ul', null, lines.map((l) => h('li', null, l))));
 }
 
 function viaBadge(via) {
@@ -435,7 +443,45 @@ function renderMeeting(panel, m) {
   const body = h('div', { class: 'panel-body' });
   const log = h('div', { class: 'meeting-log', role: 'log' });
   const controls = h('div', { class: 'meet-controls' });
+  const roster = h('div', { class: 'roster', role: 'group', 'aria-label': 'En la sala' });
+  const bar = h('div', { class: 'meet-bar' });
   let kikeDraft = '';
+
+  // Tira "En la sala": estado real de cada participante (runtime.status / runtime.location) y quién ya habló.
+  const renderRoster = () => {
+    const spoke = new Set(m.turns.filter((t) => !t.pending).map((t) => t.speaker));
+    const member = (key, name, look, state, active, color = key) =>
+      h(
+        'li',
+        { class: `roster-chip${active ? ' is-active' : ''}`, 'data-member': key, style: { '--c': `var(--agent-${color})` } },
+        avatarSvg(look),
+        h('span', { class: 'roster-name' }, name),
+        h('small', { class: 'roster-state' }, state),
+        spoke.has(key) ? h('span', { class: 'roster-done', role: 'img', 'aria-label': 'ya participó', title: 'Ya participó' }, '✓') : null
+      );
+    roster.replaceChildren(
+      h('span', { class: 'roster-label' }, 'En la sala'),
+      h(
+        'ul',
+        { class: 'roster-list' },
+        m.participants.map((id) => {
+          const st = runtime.status[id];
+          const state = STATUS_LABEL[st] || (runtime.location[id] === 'meeting' ? 'En la sala' : 'Disponible');
+          return member(id, agents[id].name, agents[id].look, state, st === 'talking' || st === 'searching');
+        }),
+        member('kike', bossName(), store.boss().look, 'Jefe', false, 'boss')
+      )
+    );
+  };
+
+  // Volver a la oficina nunca termina la reunión; "Terminar" sigue en los controles de abajo.
+  const renderBar = () => {
+    const live = (runtime.meetingBusy && runtime.activeMeetingId === m.id) || m.status === 'open';
+    bar.replaceChildren(
+      live ? h('span', { class: 'meet-live' }, h('i', { class: `live-dot${runtime.meetingBusy ? ' is-busy' : ''}`, 'aria-hidden': 'true' }), 'La reunión sigue en curso') : h('span'),
+      h('button', { class: 'btn btn-ghost btn-sm meet-back', type: 'button', onClick: () => go('#/') }, '← Volver a la oficina')
+    );
+  };
 
   const summary = () =>
     h(
@@ -547,12 +593,15 @@ function renderMeeting(panel, m) {
   };
 
   body.append(log);
-  panel.replaceChildren(header('Sala de juntas', m.status === 'closed' ? 'Acta de la reunión' : 'Reunión en curso'), body, controls);
+  panel.replaceChildren(header('Sala de juntas', m.status === 'closed' ? 'Acta de la reunión' : 'Reunión en curso', bar), roster, body, controls);
+  renderBar();
+  renderRoster();
   renderLog();
   renderControls();
   body.scrollTop = body.scrollHeight;
 
-  return on('meeting', (d) => {
+  const offStatus = on('status', renderRoster);
+  const offMeeting = on('meeting', (d) => {
     if (d.id !== m.id) return;
     if (d.type === 'turn') {
       const t = m.turns.find((x) => x.id === d.turn);
@@ -574,8 +623,14 @@ function renderMeeting(panel, m) {
     } else {
       renderLog();
       renderControls();
+      renderBar();
+      renderRoster();
     }
   });
+  return () => {
+    offStatus();
+    offMeeting();
+  };
 }
 
 export function renderMeetingPanel(panel, meetingId) {

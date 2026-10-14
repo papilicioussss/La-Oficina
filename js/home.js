@@ -108,7 +108,7 @@ export function renderHome(panel) {
         : null,
       h(
         'p',
-        { class: 'hint', style: { marginTop: '18px' } },
+        { class: 'hint mt-5' },
         '💾 Todo se guarda solo en este navegador. Descarga un respaldo de vez en cuando en Configuración → Datos.'
       )
     )
