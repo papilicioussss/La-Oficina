@@ -1,0 +1,365 @@
+/* La Oficina · Escena isométrica LEGO: sala, personajes y animaciones (solo presentación) */
+
+/* ---------- Oficina (SVG) ---------- */
+.room-floor {
+  cursor: pointer;
+  stroke: transparent;
+  stroke-width: 2;
+  transition: filter 0.2s, stroke 0.2s;
+}
+.room-floor:hover {
+  filter: brightness(1.04) saturate(1.1);
+}
+.room-floor.is-active {
+  stroke: #008ec7;
+  stroke-width: 2.5;
+  filter: brightness(1.05) saturate(1.15);
+}
+.room-floor:focus {
+  outline: none;
+  stroke: #008ec7;
+}
+.floor-lines line {
+  stroke: rgba(120, 80, 30, 0.08);
+  stroke-width: 1;
+}
+.room-label {
+  cursor: pointer;
+}
+.room-label rect {
+  fill: #ffffff;
+  stroke: #d9d9df;
+  stroke-width: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.1));
+}
+.room-label text {
+  fill: #1d2433;
+}
+.room-label.is-active rect {
+  fill: #008ec7;
+  stroke: #008ec7;
+}
+.room-label.is-active text {
+  fill: #ffffff;
+}
+.agent {
+  cursor: pointer;
+  transition: transform var(--walk, 1s) linear;
+}
+.agent:focus {
+  outline: none;
+}
+.agent:focus .nametag rect {
+  stroke: #1d2433;
+  stroke-width: 2;
+}
+.agent .body-bob {
+  animation: bob 3.4s ease-in-out infinite;
+}
+.agent[data-agent='analista'] .body-bob {
+  animation-delay: -1.1s;
+}
+.agent[data-agent='guion'] .body-bob {
+  animation-delay: -2.2s;
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.2px);
+  }
+}
+.agent .eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 5s infinite;
+}
+.agent[data-agent='analista'] .eyes {
+  animation-delay: -1.7s;
+}
+.agent[data-agent='guion'] .eyes {
+  animation-delay: -3.3s;
+}
+@keyframes blink {
+  0%,
+  95%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+.agent .arm {
+  transform-box: fill-box;
+  transform-origin: 50% 8%;
+}
+.agent.is-working .arm-l {
+  animation: type 0.32s ease-in-out infinite alternate;
+}
+.agent.is-working .arm-r {
+  animation: type 0.32s ease-in-out infinite alternate-reverse;
+}
+@keyframes type {
+  from {
+    transform: rotate(-14deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+.agent .mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.agent.is-talking .mouth {
+  animation: talk 0.22s ease-in-out infinite alternate;
+}
+.agent.is-talking .arm-r {
+  animation: gesture 0.9s ease-in-out infinite alternate;
+}
+@keyframes talk {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(2.4);
+  }
+}
+@keyframes gesture {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-35deg);
+  }
+}
+.agent.walking .body-bob {
+  animation: walkbob 0.36s ease-in-out infinite alternate;
+}
+.agent.walking .leg-l {
+  animation: step 0.36s ease-in-out infinite alternate;
+}
+.agent.walking .leg-r {
+  animation: step 0.36s ease-in-out infinite alternate-reverse;
+}
+@keyframes walkbob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-2px);
+  }
+}
+@keyframes step {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+/* ---------- Personalidad de cada agente (solo presentación; usa data-status y .is-working / .is-talking) ---------- */
+.agent .brow,
+.agent .arm,
+.agent .fx,
+.agent .acc-note,
+.agent .acc-tablet,
+.agent .acc-cards,
+.agent .card,
+.agent .chart-bar,
+.agent .mouth,
+.agent .body-bob {
+  transform-box: fill-box;
+}
+.agent .brow {
+  transform-origin: center;
+  transition: transform 0.25s;
+}
+.agent .fx {
+  opacity: 0;
+  transform-origin: center;
+  transition: opacity 0.25s;
+}
+
+/* Reposo */
+.agent[data-agent='copy'][data-status='idle']:not(.walking):not(.done) .acc-note {
+  transform-origin: 50% 80%;
+  animation: note-tap 2.6s ease-in-out infinite;
+}
+@keyframes note-tap {
+  0%, 70%, 100% { transform: rotate(0deg); }
+  78% { transform: rotate(-12deg); }
+  86% { transform: rotate(4deg); }
+}
+.agent[data-agent='analista'][data-status='idle']:not(.walking):not(.done) .acc-tablet {
+  transform-origin: 50% 50%;
+  animation: tablet-turn 4.2s ease-in-out infinite;
+}
+@keyframes tablet-turn {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(-10deg); }
+  70% { transform: rotate(8deg); }
+}
+.agent[data-agent='guion'][data-status='idle']:not(.walking):not(.done) .card.c1 {
+  animation: card-shuffle 3.4s ease-in-out infinite;
+}
+.agent[data-agent='guion'][data-status='idle']:not(.walking):not(.done) .card.c3 {
+  animation: card-shuffle 3.4s ease-in-out -1.7s infinite;
+}
+@keyframes card-shuffle {
+  0%, 60%, 100% { transform: translateY(0); }
+  75% { transform: translateY(-1.6px); }
+}
+
+/* Trabajo: pensando / buscando */
+.agent[data-agent='copy'].is-working .acc-note {
+  transform-origin: 50% 80%;
+  animation: note-write 0.28s ease-in-out infinite alternate;
+}
+@keyframes note-write {
+  from { transform: rotate(-5deg) translateX(-0.6px); }
+  to { transform: rotate(5deg) translateX(0.6px); }
+}
+.agent[data-agent='copy'][data-status='thinking'] .fx-idea {
+  animation: idea-blink 1.6s ease-in-out infinite;
+}
+@keyframes idea-blink {
+  0%, 100% { opacity: 0; transform: translateY(1px) scale(0.8); }
+  35%, 70% { opacity: 1; transform: translateY(-1px) scale(1); }
+}
+.agent[data-agent='analista'].is-working .chart-bar {
+  transform-origin: 50% 100%;
+  animation: bar-grow 1.1s ease-in-out infinite alternate;
+}
+.agent[data-agent='analista'].is-working .chart-bar:nth-of-type(2) { animation-delay: -0.35s; }
+.agent[data-agent='analista'].is-working .chart-bar:nth-of-type(3) { animation-delay: -0.7s; }
+@keyframes bar-grow {
+  from { transform: scaleY(0.45); }
+  to { transform: scaleY(1.15); }
+}
+.agent[data-agent='analista'][data-status='searching'] .fx-search {
+  animation: search-sweep 1.4s ease-in-out infinite;
+  opacity: 1;
+}
+@keyframes search-sweep {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -1px); }
+}
+.agent[data-agent='analista'][data-status='thinking'] .brow-r {
+  transform: translateY(-1.6px) rotate(-8deg);
+}
+.agent[data-agent='guion'].is-working .acc-cards {
+  transform-origin: 50% 90%;
+  animation: cards-sort 0.7s ease-in-out infinite alternate;
+}
+@keyframes cards-sort {
+  from { transform: rotate(-6deg); }
+  to { transform: rotate(6deg); }
+}
+.agent[data-agent='guion'].is-working .brow {
+  transform: translateY(0.8px) scaleX(0.92);
+}
+.agent[data-agent='guion'][data-status='searching'] .fx-check {
+  opacity: 0;
+}
+
+/* Reunión y habla */
+.agent[data-agent='analista'].is-talking .acc-tablet,
+.agent[data-agent='analista'][data-status='meeting'] .acc-tablet {
+  transform-origin: 50% 100%;
+  animation: tablet-present 1.2s ease-in-out infinite alternate;
+}
+@keyframes tablet-present {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-3px) rotate(-6deg); }
+}
+.agent[data-agent='copy'].is-talking .acc-note {
+  transform-origin: 50% 80%;
+  animation: note-tap 1.8s ease-in-out infinite;
+}
+.agent[data-agent='guion'].is-talking .acc-cards,
+.agent[data-agent='guion'][data-status='meeting'] .acc-cards {
+  transform-origin: 50% 90%;
+  animation: cards-sort 1.4s ease-in-out infinite alternate;
+}
+.agent.is-talking .brow {
+  transform: translateY(-0.9px);
+}
+
+/* Finalización: gesto corto al terminar una tarea (la clase .done la pone office.js al cambiar el estado) */
+.agent.done .body-bob {
+  animation: done-hop 0.9s ease-out 1;
+}
+@keyframes done-hop {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(-3.2px); }
+  50% { transform: translateY(0); }
+  70% { transform: translateY(-1.4px); }
+  100% { transform: translateY(0); }
+}
+.agent[data-agent='copy'].done .arm-l,
+.agent[data-agent='copy'].done .arm-r {
+  animation: cheer 0.9s ease-out 1;
+}
+@keyframes cheer {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-70deg); }
+}
+.agent[data-agent='copy'].done .arm-r {
+  animation-name: cheer-r;
+}
+@keyframes cheer-r {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(70deg); }
+}
+.agent.done .mouth {
+  animation: smile 1.4s ease-out 1;
+}
+@keyframes smile {
+  0%, 100% { transform: scale(1); }
+  25%, 70% { transform: scale(1.5, 1.8); }
+}
+.agent[data-agent='analista'].done .acc-tablet {
+  transform-origin: 50% 100%;
+  animation: tablet-present 0.6s ease-in-out 2 alternate;
+}
+.agent[data-agent='guion'].done .fx-check {
+  animation: check-pop 1.6s ease-out 1;
+}
+@keyframes check-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  25%, 75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+.agent .bubble {
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.agent:not([data-status='idle']) .bubble {
+  opacity: 1;
+}
+.agent .bubble-bg,
+.agent .bubble-tail {
+  fill: #ffffff;
+  stroke: #d4d4da;
+  stroke-width: 0.8;
+}
+.agent .bubble-text {
+  fill: #1d2433;
+}
+.agent[data-status='meeting'] .bubble {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent,
+  .agent * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

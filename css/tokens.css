@@ -1,0 +1,206 @@
+/* La Oficina · Tokens de diseño
+   Interfaz 2D: SaaS sobrio con principios de macOS. El universo LEGO vive solo en la escena (css/office.css y js/office.js).
+   Todo componente debe usar estas variables en lugar de valores sueltos. */
+
+:root {
+  /* Tipografía */
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --w-bold: 700;
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --track-tight: -0.011em;
+
+  /* Espaciado (múltiplos de 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radios */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Movimiento */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Capas */
+  --z-sticky: 10;
+  --z-sheet: 40;
+  --z-modal: 60;
+  --z-toast: 100;
+
+  /* Medidas */
+  --topbar-h: 60px;
+  --control-h: 36px;
+  --tap: 44px;
+  --border: 1px solid var(--line);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+
+  /* Marca Vacilando Ando (recursos existentes: logo y colores ya usados en la app) */
+  --brand-orange: #ff8a3d;
+  --brand-orange-2: #ffab41;
+  --brand-yellow: #fde07e;
+  --brand-green: #00a100;
+  --brand-green-dark: #007d00;
+  --brand-green-light: #30bb4f;
+  --brand-sky: #00b9ec;
+  --brand-blue: #008ec7;
+  --brand-navy: #324966;
+  --brand-cream: #fcfcf7;
+
+  /* Colores LEGO clásicos (solo para la escena y acentos de personajes) */
+  --lego-red: #c91a09;
+  --lego-yellow: #f2cd37;
+  --lego-blue: #0055bf;
+  --lego-green: #237841;
+  --lego-white: #f4f4f2;
+  --lego-orange: #fe8a18;
+
+  /* Colores por agente (los mismos que sus nametags en la escena) */
+  --agent-copy: #ff8a3d;
+  --agent-analista: #008ec7;
+  --agent-guion: #7a5af8;
+  --agent-boss: #e7b84a;
+
+  /* Alias heredados: usar --brand-orange / --brand-orange-2 en código nuevo */
+  --coral: var(--brand-orange);
+  --sun: var(--brand-orange-2);
+  --cta-grad: var(--cta-bg);
+  --shadow: var(--shadow-1);
+  --radius-md: var(--radius);
+}
+
+:root {
+  color-scheme: light;
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f7f7f9;
+  --surface-3: #ececf0;
+  --ink: #1d1d1f;
+  --ink-2: #48484d;
+  --muted: #6e6e76;
+  --line: #e4e4e9;
+  --line-strong: #cfcfd6;
+  --accent: #0078ab;
+  --accent-strong: #005f8a;
+  --accent-ink: #ffffff;
+  --accent-soft: #d8f1fb;
+  --danger: #c73a3a;
+  --on-danger: #ffffff;
+  --danger-soft: #fbe6e6;
+  --ok: #007d00;
+  --on-ok: #ffffff;
+  --ok-soft: #dff3df;
+  --warn: #8a5a00;
+  --warn-bg: #fff1cf;
+  --scrim: rgba(15, 20, 30, 0.45);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.10);
+  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.14), 0 24px 64px rgba(0, 0, 0, 0.16);
+  --office-bg: radial-gradient(ellipse at 50% 40%, #ffffff 0%, #f5f5f7 75%);
+  --cta-bg: #324966;
+  --chart-surface: #ffffff;
+  --grid: #ebebef;
+  --axis: #cfcfd6;
+  --series-ig: #2a78d6;
+  --series-tt: #eb6834;
+  --tip-bg: #1a2433;
+  --tip-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #1c1c1e;
+    --surface: #2a2a2d;
+    --surface-2: #323236;
+    --surface-3: #3a3a3f;
+    --ink: #f5f5f7;
+    --ink-2: #d0d0d6;
+    --muted: #98989f;
+    --line: #3a3a3f;
+    --line-strong: #4a4a50;
+    --accent: #00b9ec;
+    --accent-strong: #5fd3f5;
+    --accent-ink: #04202d;
+    --accent-soft: #17394d;
+    --danger: #ef6b6b;
+    --on-danger: #2a0a0a;
+    --danger-soft: #3d2023;
+    --ok: #3fcf73;
+    --on-ok: #04200d;
+    --ok-soft: #17372a;
+    --warn: #fde07e;
+    --warn-bg: #3b3115;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.4);
+    --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.45), 0 24px 64px rgba(0, 0, 0, 0.5);
+    --office-bg: radial-gradient(ellipse at 50% 40%, #2c2c30 0%, #1c1c1e 75%);
+    --cta-bg: #1d6f8f;
+    --chart-surface: #2a2a2d;
+    --grid: #3a3a3f;
+    --axis: #55555c;
+    --series-ig: #3987e5;
+    --series-tt: #d95926;
+    --tip-bg: #f5f5f7;
+    --tip-ink: #1d2433;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1c1c1e;
+  --surface: #2a2a2d;
+  --surface-2: #323236;
+  --surface-3: #3a3a3f;
+  --ink: #f5f5f7;
+  --ink-2: #d0d0d6;
+  --muted: #98989f;
+  --line: #3a3a3f;
+  --line-strong: #4a4a50;
+  --accent: #00b9ec;
+  --accent-strong: #5fd3f5;
+  --accent-ink: #04202d;
+  --accent-soft: #17394d;
+  --danger: #ef6b6b;
+  --on-danger: #2a0a0a;
+  --danger-soft: #3d2023;
+  --ok: #3fcf73;
+  --on-ok: #04200d;
+  --ok-soft: #17372a;
+  --warn: #fde07e;
+  --warn-bg: #3b3115;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.45), 0 24px 64px rgba(0, 0, 0, 0.5);
+  --office-bg: radial-gradient(ellipse at 50% 40%, #2c2c30 0%, #1c1c1e 75%);
+  --cta-bg: #1d6f8f;
+  --chart-surface: #2a2a2d;
+  --grid: #3a3a3f;
+  --axis: #55555c;
+  --series-ig: #3987e5;
+  --series-tt: #d95926;
+  --tip-bg: #f5f5f7;
+  --tip-ink: #1d2433;
+}
