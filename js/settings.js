@@ -6,7 +6,7 @@ import { AGENT_IDS, DEFAULT_SOURCES } from './store.js';
 import { runtime, emit, go } from './state.js';
 import { listModels } from './gemini.js';
 import { tavilySearch, SearchUnavailable } from './search.js';
-import { listGroqModels } from './groq.js';
+import { listGroqModels, autoPick } from './groq.js';
 import { ROLES } from './prompts.js';
 import { avatarSvg } from './office.js';
 import { catHeadSvg } from './cat-sprite.js';
@@ -333,7 +333,7 @@ function groqModelSelect(current, onChange) {
   const known = s.groqKnownModels?.length
     ? s.groqKnownModels
     : [
-        { id: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile' },
+        { id: 'openai/gpt-oss-120b', label: 'openai/gpt-oss-120b' },
         { id: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant' },
       ];
   const list = [...known];
@@ -354,25 +354,51 @@ function groqSection(s) {
   }, 'gsk_…');
   const test = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, 'Probar');
   const models = h('div');
-  const renderModels = () =>
-    models.replaceChildren(
-      field(
-        'Modelo de Groq',
-        groqModelSelect(s.groqModel, (v) => {
-          s.groqModel = v;
-          saveSettings();
+  const renderModels = () => {
+    const pick = autoPick(s.groqKnownModels);
+    const auto = h(
+      'div',
+      { class: 'field' },
+      h(
+        'label',
+        { class: 'check' },
+        h('input', {
+          type: 'checkbox',
+          checked: s.groqAuto !== false,
+          onChange: (e) => {
+            s.groqAuto = e.target.checked;
+            saveSettings();
+            renderModels();
+          },
         }),
-        'Para las reuniones y el respaldo. Recomendado: llama-3.3-70b-versatile (buen español) o uno de 70B+ que aparezca en tu lista.'
+        'Elegir el modelo de Groq automáticamente (recomendado)'
       ),
-      field(
-        'Modelo rápido de Groq',
-        groqModelSelect(s.groqFastModel, (v) => {
-          s.groqFastModel = v;
-          saveSettings();
-        }),
-        'Para preparar las búsquedas de la sala de juntas (tarea pequeña).'
-      )
+      h('div', { class: 'hint' }, `Ahora usa: ${pick.main} para lo normal y ${pick.fast} para lo rápido. Si Groq retira un modelo, la app cambia sola. Toca "Probar" para que mire tu lista.`)
     );
+    models.replaceChildren(
+      auto,
+      ...(s.groqAuto === false
+        ? [
+            field(
+              'Modelo de Groq',
+              groqModelSelect(s.groqModel, (v) => {
+                s.groqModel = v;
+                saveSettings();
+              }),
+              'Para las reuniones y el respaldo. Recomendado: openai/gpt-oss-120b. Evita allam-2-7b (está pensado para árabe).'
+            ),
+            field(
+              'Modelo rápido de Groq',
+              groqModelSelect(s.groqFastModel, (v) => {
+                s.groqFastModel = v;
+                saveSettings();
+              }),
+              'Para saludos y tareas pequeñas. Recomendado: llama-3.1-8b-instant.'
+            ),
+          ]
+        : [])
+    );
+  };
   renderModels();
   test.addEventListener('click', async () => {
     store.save('settings');
@@ -392,7 +418,7 @@ function groqSection(s) {
       renderModels();
       status.className = 'ok-text';
       status.textContent = `✔ Conectado. ${list.length} modelos disponibles.`;
-      if (list.length && !list.some((m) => m.id === s.groqModel)) toast(`Ojo: "${s.groqModel}" ya no está en Groq. Elige otro modelo.`, 'warn', 7000);
+      if (s.groqAuto === false && list.length && !list.some((m) => m.id === s.groqModel)) toast(`Ojo: "${s.groqModel}" ya no está en Groq. Activa el modo automático o elige otro.`, 'warn', 7000);
     } catch (e) {
       status.className = 'err-text';
       status.textContent = '✖ ' + e.message;

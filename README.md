@@ -71,6 +71,7 @@ Cada agente tiene su biblioteca (29 skills): ganchos, captions, persuasión, psi
 - **Modelo según la tarea:** los agentes y el gato eligen solos. Un saludo o un "gracias" usa el modelo rápido (o Groq si está activo), con un prompt mínimo y sin herramientas; lo normal usa el modelo principal; las tareas grandes (planes, análisis, guiones completos, fotos, textos largos) usan el modelo potente si lo configuras en Configuración → Claves. En la respuesta ves la etiqueta ⚡ rápido o 🧠 potente.
 - **Otros ahorros:** historial recortado (los mensajes viejos se acortan), las skills y la tabla de métricas solo se cargan cuando la consulta las necesita, resultados de búsqueda más compactos y transcripciones de reunión recortadas.
 - Se puede apagar el modelo automático en Configuración → Claves.
+- **Groq sin elegir nada:** la app mira la lista de modelos de tu key y usa sola `openai/gpt-oss-120b` para lo normal y `llama-3.1-8b-instant` para lo rápido (con alternativas si Groq cambia su lista). Si un modelo es retirado, cambia sola. Puedes fijar uno a mano desmarcando "automático" en Configuración → Claves.
 
 ## Identidad de marca
 

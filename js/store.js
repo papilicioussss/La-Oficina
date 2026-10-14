@@ -37,7 +37,8 @@ export const DEFAULTS = {
     webSearch: true,
     sources: DEFAULT_SOURCES,
     groqKey: '',
-    groqModel: 'llama-3.3-70b-versatile',
+    groqAuto: true,
+    groqModel: 'openai/gpt-oss-120b',
     groqFastModel: 'llama-3.1-8b-instant',
     groqKnownModels: [],
     groqMeetings: true, // turnos de los agentes en la sala de juntas

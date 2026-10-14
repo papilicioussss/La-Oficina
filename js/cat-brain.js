@@ -2,7 +2,7 @@
 
 import * as store from './store.js';
 import { generate, ApiError } from './gemini.js';
-import { groqChat, groqJSON } from './groq.js';
+import { groqChat, groqJSON, groqModelFor } from './groq.js';
 import { buildCatPrompt, CAT_TOOLS, bossName, catName } from './prompts.js';
 import { addFact, removeFact, updateFact, restoreFact, facts, MEM_CATS } from './memory.js';
 import { groqReady, noteGroqFailure, lightGenerate, SetupError } from './brain.js';
@@ -98,7 +98,7 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
     onStatus?.('thinking');
     const reply = await groqChat({
       apiKey: s.groqKey,
-      model: s.groqModel,
+      model: groqModelFor('main'),
       system: buildCatPrompt() + '\n\n(En este momento no tienes herramientas: conversa normal; los datos que te den se guardan solos.)',
       messages: toContents(history, text, [], tier).map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
       signal,
@@ -109,7 +109,8 @@ export async function runCat({ history, text, images = [], onText, onStatus, sig
         const known = facts().map((f) => `[${f.id}] (${f.cat}) ${f.text}`).join('\n') || '(vacía)';
         const j = await groqJSON({
           apiKey: s.groqKey,
-          model: s.groqFastModel || s.groqModel,
+          kind: 'fast',
+          model: groqModelFor('fast'),
           prompt: `${bossName()} le escribió esto a su gato asistente:\n"""${text}"""\n\nMemoria actual:\n${known}\n\nExtrae SOLO los datos nuevos o corregidos de la marca que aparezcan en ese mensaje (precios, destinos, tono, público, operación…). Cada dato: una frase clara y autosuficiente. Si corrige uno existente, pon su id en reemplaza_id. Si no hay datos nuevos, devuelve una lista vacía. Categorías válidas: ${MEM_CATS.map((c) => c.id).join(', ')}.\nResponde solo JSON: {"datos":[{"categoria":"...","dato":"...","reemplaza_id":""}]}`,
           signal,
         });

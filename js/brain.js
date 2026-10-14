@@ -2,7 +2,7 @@
 
 import * as store from './store.js';
 import { generate, generateJSON, ApiError } from './gemini.js';
-import { groqChat, groqJSON, GroqError } from './groq.js';
+import { groqChat, groqJSON, GroqError, groqModelFor } from './groq.js';
 import { tavilySearch, toTimeRange, SearchUnavailable, SearchError } from './search.js';
 import { buildSystemPrompt, buildLightPrompt, SEARCH_TOOL, ROLES, agentName, bossName, today } from './prompts.js';
 import { classify, modelFor, trimHistory } from './router.js';
@@ -94,7 +94,7 @@ export async function lightGenerate({ system, history, text, signal, onText, onS
   const first = modelFor('light', { groqOk: groqReady() });
   if (first.provider === 'groq') {
     try {
-      const out = await groqChat({ apiKey: s.groqKey, model: first.model, system, messages, signal, onText, maxTokens: 400 });
+      const out = await groqChat({ kind: 'fast', apiKey: s.groqKey, model: first.model, system, messages, signal, onText, maxTokens: 400 });
       return { text: out, via: 'groq', model: first.model };
     } catch (e) {
       if (e.name === 'AbortError') throw e;
@@ -221,7 +221,7 @@ export async function runAgent({ agentId, history, text, images = [], forcedSkil
     try {
       const reply = await groqChat({
         apiKey: s.groqKey,
-        model: s.groqModel,
+        model: groqModelFor('main'),
         system: buildSystemPrompt(agentId, { searchAvailable: false, skills }),
         messages: contents.map((c) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts.map((p) => p.text || '').join('') })),
         signal,
@@ -275,7 +275,8 @@ export async function research({ meeting, focus, signal, onStatus }) {
       try {
         const j = await groqJSON({
           apiKey: s.groqKey,
-          model: s.groqFastModel || s.groqModel,
+          kind: 'fast',
+          model: groqModelFor('fast'),
           prompt: `${queryPrompt}\n\nResponde solo con JSON: {"queries": ["...", "...", "..."]}`,
           signal,
         });
@@ -391,7 +392,7 @@ Tu turno, ${agentName(agentId)}. Aporta desde tu área: ${ROLES[agentId].meeting
 async function dualGenerate({ system, user, signal, onText, preferGroq }) {
   const s = store.settings();
   const viaGroq = () =>
-    groqChat({ apiKey: s.groqKey, model: s.groqModel, system, messages: [{ role: 'user', content: user }], signal, onText }).then((text) => ({
+    groqChat({ apiKey: s.groqKey, model: groqModelFor('main'), system, messages: [{ role: 'user', content: user }], signal, onText }).then((text) => ({
       text,
       via: 'groq',
     }));

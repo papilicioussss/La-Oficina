@@ -6,6 +6,7 @@
 
 import * as store from './store.js';
 import { norm } from './skills.js';
+import { groqModelFor } from './groq.js';
 
 const SMALL_WORDS = new Set(
   `hola holi holaa holaaa buenas buenos buen dia dias tarde tardes noche noches hey epa saludos que tal como estas esta andas vas amaneciste
@@ -50,7 +51,7 @@ export function modelFor(tier, { groqOk = false } = {}) {
   const s = store.settings();
   if (s.routerOn === false) return { provider: 'gemini', model: s.model, label: 'principal' };
   if (tier === 'light') {
-    if (groqOk && s.lightGroq !== false && s.groqKey) return { provider: 'groq', model: s.groqFastModel || s.groqModel, label: 'rápido' };
+    if (groqOk && s.lightGroq !== false && s.groqKey) return { provider: 'groq', model: groqModelFor('fast'), label: 'rápido' };
     return { provider: 'gemini', model: s.fastModel || s.model, label: 'rápido' };
   }
   if (tier === 'heavy' && s.heavyModel) return { provider: 'gemini', model: s.heavyModel, label: 'potente' };
