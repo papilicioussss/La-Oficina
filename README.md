@@ -102,6 +102,10 @@ Si la app te dice *"No pude conectar con Tavily desde el navegador"*, se pasa so
 3. (Opcional, más seguro) En el Worker: **Settings → Variables → Add secret** con el nombre `TAVILY_API_KEY` y tu key. Así la key no tiene que estar en el navegador.
 4. Copia la URL del Worker (algo como `https://tavily-proxy.tu-usuario.workers.dev`) y pégala en **Configuración → Claves → Avanzado: proxy de Tavily**.
 
+## Prueba 3D (experimental)
+
+En `prueba-3d/` hay una página aparte, independiente de la app, para probar una oficina 3D estilo LEGO con Three.js (archivos incluidos en `prueba-3d/vendor/`, sin servidores externos). Se abre en `.../La-Oficina/prueba-3d/`. No afecta a la oficina SVG ni a los agentes.
+
 ## Para desarrollo
 
 Es una página estática sin compilación (HTML + CSS + módulos de JavaScript). Para probarla en tu compu:

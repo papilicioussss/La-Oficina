@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Prueba 3D · La Oficina</title>
+    <!-- Three.js se sirve desde esta misma carpeta (vendor/): no depende de ningún servidor externo -->
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+    </script>
+    <style>
+      :root { color-scheme: light dark; --ink: #1d1d1f; --panel: rgba(255, 255, 255, 0.86); --line: rgba(0, 0, 0, 0.12); --accent: #0078ab; }
+      @media (prefers-color-scheme: dark) { :root { --ink: #f5f5f7; --panel: rgba(42, 42, 45, 0.88); --line: rgba(255, 255, 255, 0.16); --accent: #00b9ec; } }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; font: 14px/1.45 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif; color: var(--ink); }
+      body { background: radial-gradient(ellipse at 50% 35%, #ffffff 0%, #e9ebef 80%); overflow: hidden; }
+      @media (prefers-color-scheme: dark) { body { background: radial-gradient(ellipse at 50% 35%, #34353a 0%, #1c1c1e 80%); } }
+      #lienzo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .panel { position: fixed; left: 12px; top: 12px; max-width: min(340px, calc(100vw - 24px)); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(10px); }
+      .panel summary { font-size: 15px; margin: 0 0 4px; font-weight: 600; cursor: pointer; min-height: 28px; }
+      @media (max-width: 600px) { #resumen { display: none; } }
+      .panel p { margin: 0 0 8px; font-size: 13px; opacity: 0.8; }
+      .fila { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+      button, select { font: inherit; color: inherit; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 7px 11px; min-height: 36px; cursor: pointer; }
+      button:hover, select:hover { border-color: var(--accent); }
+      button[aria-pressed='true'] { background: var(--accent); color: #fff; border-color: var(--accent); }
+      :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+      a { color: var(--accent); }
+      .pie { position: fixed; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; gap: 8px; font-size: 12px; opacity: 0.75; pointer-events: none; }
+      #sin-3d { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 8px; }
+      [hidden] { display: none !important; }
+      @media (pointer: coarse) { button, select { min-height: 44px; } }
+    </style>
+  </head>
+  <body>
+    <canvas id="lienzo" aria-label="Plataforma LEGO en 3D: arrastra para girar, pellizca o usa la rueda para acercar"></canvas>
+    <details class="panel" id="panel">
+      <summary>Prueba 3D · estilo LEGO</summary>
+      <p>Arrastra para girar · rueda o pellizco para acercar · dos dedos o clic derecho para mover.</p>
+      <div class="fila">
+        <button id="vista" type="button">Vista isométrica</button>
+        <button id="girar" type="button" aria-pressed="false">Girar solo</button>
+        <button id="estado" type="button">Animación de prueba: idle</button>
+      </div>
+      <div class="fila">
+        <label for="calidad">Calidad</label>
+        <select id="calidad">
+          <option value="auto">Automática</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="baja">Baja</option>
+        </select>
+      </div>
+      <div class="fila"><a href="../">← Volver a La Oficina</a></div>
+    </details>
+    <div class="pie"><span id="estado-calidad"></span><span id="resumen"></span><span id="fps"></span></div>
+    <div id="sin-3d" hidden>
+      <strong>Este navegador no puede mostrar 3D (WebGL).</strong>
+      <span>La oficina de siempre sigue funcionando.</span>
+      <a href="../">Volver a La Oficina</a>
+    </div>
+    <noscript>Esta prueba necesita JavaScript activado.</noscript>
+    <script type="module" src="./main.js"></script>
+    <script type="module">
+      // si el motor no carga (archivo faltante o navegador muy viejo) se avisa en vez de dejar la página en blanco
+      addEventListener('error', () => {
+        if (!document.body.dataset.listo) document.getElementById('sin-3d').hidden = false;
+      });
+    </script>
+  </body>
+</html>
