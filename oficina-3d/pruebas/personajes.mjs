@@ -9,7 +9,7 @@ const BASE = process.env.BASE || 'http://localhost:8123/';
 const URL3D = BASE + 'oficina-3d/';
 const CAPTURAS = process.env.CAPTURAS || './capturas-oficina-3d/';
 mkdirSync(CAPTURAS, { recursive: true });
-const FASES = (process.env.FASES || '1,2,3,4,5').split(',').map(Number);
+const FASES = (process.env.FASES || '1,2,3,4,5,nico').split(',').map((x) => (isNaN(+x) ? x : +x));
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle'] });
 let fallos = 0;
@@ -61,7 +61,7 @@ if (FASES.includes(1)) {
   await paso('F1 · apariencia y accesorios según la app (kitParts y apariencia por defecto)', async () => {
     const r = await page.evaluate(() => Object.fromEntries(Object.entries(window.oficina3d.agentes.agentes).map(([id, a]) => [id, { look: a.look, nombre: a.nombre, acc: a.fig.accesorios }])));
     const esperado = {
-      copy: { cabeza: 5, manoDer: 1, manoIzq: 0, peinado: 'bajo la gorra' }, // gorra, visera, diadema y 2 audífonos; libreta
+      copy: { modelo: 'nico', cabeza: 2, manoDer: 1, manoIzq: 1, peinado: 'pelo LEGO' }, // modelo propio: pelo y cara; bolígrafo; libreta
       analista: { cabeza: 3, manoDer: 0, manoIzq: 1, peinado: 'short' }, // 2 aros y puente de lentes; tableta
       guion: { cabeza: 0, manoDer: 1, manoIzq: 0, peinado: 'curly' }, // tarjetas; audífonos al cuello van en el torso
     };
@@ -72,7 +72,7 @@ if (FASES.includes(1)) {
       for (const [k, v] of Object.entries(esperado[id])) if (a.acc[k] !== v) throw new Error(`${id}: ${k} = ${a.acc[k]} (esperado ${v})`);
       if (!a.acc.senal || a.acc.torso < 3) throw new Error(`${id}: faltan prendas o señal`);
     }
-    return 'Nico: sudadera, gorra, audífonos, libreta · Alex: saco, lentes, tableta · Sam: sudadera, audífonos al cuello, tarjetas';
+    return 'Nico (modelo propio): sudadera con capucha, pelo LEGO, libreta y bolígrafo · Alex: saco, lentes, tableta · Sam: sudadera, audífonos al cuello, tarjetas';
   });
 
   await paso('F1 · sentados (en reposo animado) sin atravesar escritorio, asiento ni respaldo', async () => {
@@ -848,6 +848,437 @@ if (FASES.includes(5)) {
     return '0 cuadros en pausa; se reanuda con un toque o con un cambio de estado real';
   });
   console.log('MÉTRICAS-PERSONAJES ' + JSON.stringify(metricas));
+}
+
+// ─────────────────────────────── NICO: modelo propio, acciones y utilería ───────────────────────────────
+if (FASES.includes('nico')) {
+  const { page, ctx, errores } = await abrir('?calidad=alta', { w: 1000, h: 700 });
+  // utilidades en la página: avanzar con paso fijo y registrar lo que hace Nico
+  await page.evaluate(() => {
+    const O = window.oficina3d;
+    O.pasoManual(true);
+    window.__nico = {
+      a: () => O.agentes.agentes.copy,
+      grabar(segundos, cada = 1 / 30, extra) {
+        const a = O.agentes.agentes.copy;
+        const out = [];
+        for (let t = 0; t < segundos; t += cada) {
+          extra?.(t);
+          O.avanzar(cada);
+          const u = a.fig.utileria();
+          out.push({ t, acc: a.fig.accion(), anim: a.anim, lib: u.libreta, boli: u.boligrafo, senal: a.fig.senal.visible, E: a.fig.expresion(), vel: a.fig.velocidad, globo: O.etiquetas.items.get('copy').texto });
+        }
+        return out;
+      },
+    };
+  });
+
+  await paso('NICO · modelo propio por piezas: pelo, cara, utilería escondida en reposo', async () => {
+    const r = await page.evaluate(() => {
+      const a = window.__nico.a();
+      const nombres = [];
+      a.fig.objeto.traverse((o) => o.isMesh && nombres.push(o.name));
+      return { modelo: a.modelo.objeto.userData.modelo, nombres, util: a.fig.utileria(), libreta: a.fig.libreta.visible, boli: a.fig.boligrafo.visible, acc: a.fig.accesorios };
+    });
+    if (r.modelo !== 'nico') throw new Error('modelo ' + r.modelo);
+    for (const n of ['cara', 'pelo:plastico', 'torso:impreso', 'piernaI:impreso', 'cadera:impreso', 'tapa:plastico', 'cuerpo-boli:plastico']) if (!r.nombres.includes(n)) throw new Error('falta ' + n);
+    if (r.libreta || r.boli || r.util.libreta || r.util.boligrafo) throw new Error('la utilería se ve en reposo');
+    if (errores.length) throw new Error(errores.join(' | '));
+    return `${r.nombres.length} mallas (unidas por articulación y por tipo de material)`;
+  });
+
+  await paso('NICO · LEGO estricto: solo giran las articulaciones reales, y solo en su eje', async () => {
+    const r = await page.evaluate(() => {
+      const fig = window.__nico.a().fig;
+      const art = fig.articulaciones;
+      const fijos = ['torso', 'cadera', 'pelo'].map((n) => fig.objeto.getObjectByName(n));
+      const ejes = { x: 0, y: 1, z: 2 };
+      let peor = null;
+      let max = 0;
+      const base = {};
+      for (const [n, [o]] of Object.entries(art)) base[n] = [o.rotation.x, o.rotation.y, o.rotation.z];
+      const revisar = (accion) => {
+        for (const [n, [o, eje]] of Object.entries(art)) {
+          const rot = [o.rotation.x, o.rotation.y, o.rotation.z];
+          rot.forEach((v, i) => {
+            if (i === ejes[eje]) return;
+            const d = Math.abs(v - base[n][i]);
+            if (d > 1e-6 && d > max) {
+              max = d;
+              peor = `${n}.${'xyz'[i]} en ${accion}`;
+            }
+          });
+        }
+        for (const o of fijos) if (Math.abs(o.rotation.x) + Math.abs(o.rotation.y) + Math.abs(o.rotation.z) > 1e-6) peor = `${o.name} giró en ${accion}`;
+      };
+      const casos = [['thinking', 'teclear'], ['thinking', 'pensar'], ['thinking', 'idea'], ['thinking', 'anotar'], ['talking', 'hablar'], ['talking', 'consultar'], ['escucha', 'asentir'], ['escucha', 'notas'], ['searching', 'escanear'], ['terminado', 'festejo'], ['idle', 'pelo'], ['idle', 'saludar'], ['idle', 'estirarse'], ['idle', 'tamborilear'], ['idle', 'repasar'], ['idle', 'reposo']];
+      for (const [estado, accion] of casos) {
+        fig.fijarAccion(accion);
+        for (let i = 0; i < 90; i++) {
+          fig.animar(estado, 3000 + i / 30, 1 / 30);
+          revisar(accion);
+        }
+      }
+      fig.velocidad = 8;
+      fig.fijarAccion(null);
+      for (let i = 0; i < 90; i++) {
+        fig.animar('walking', 3100 + i / 30, 1 / 30);
+        revisar('caminar');
+      }
+      fig.velocidad = 0;
+      fig.animar('idle', 3200, 1);
+      return { peor, max };
+    });
+    if (r.peor) throw new Error(`gira fuera de su eje: ${r.peor} (${r.max.toFixed(3)} rad)`);
+    return 'cabeza solo gira a los lados · brazos y piernas solo adelante/atrás · manos solo en su muñeca · torso y cadera fijos (17 acciones)';
+  });
+
+  await paso('NICO · la capucha no atraviesa la cabeza, el pelo ni los brazos en ninguna acción', async () => {
+    const r = await page.evaluate(() => {
+      const THREE = window.oficina3d.THREE;
+      const fig = window.__nico.a().fig;
+      const cap = fig.capucha;
+      const art = fig.articulaciones;
+      const v = new THREE.Vector3();
+      const a = new THREE.Vector3();
+      const b = new THREE.Vector3();
+      const dSeg = (p, p0, p1) => {
+        const ab = b.subVectors(p1, p0);
+        const t = Math.max(0, Math.min(1, a.subVectors(p, p0).dot(ab) / ab.lengthSq()));
+        return p.distanceTo(a.copy(p0).addScaledVector(ab, t));
+      };
+      const codo = Math.cos(0.62);
+      const errores = new Set();
+      const revisar = (accion) => {
+        fig.objeto.updateMatrixWorld(true);
+        const cab = art.cabeza[0];
+        const brazos = [[art.hombroI[0], -1], [art.hombroD[0], 1]];
+        for (let i = 0; i < cap.length; i += 9) {
+          v.set(cap[i], cap[i + 1], cap[i + 2]).applyMatrix4(fig.torso.matrixWorld);
+          // cabeza (cilindro de radio .6 y alto 1.1) y pelo (que empieza a .26 de la base de la cabeza en la nuca)
+          const h = cab.worldToLocal(v.clone());
+          const rad = Math.hypot(h.x, h.z);
+          if (h.y > 0 && h.y < 1.1 && rad < 0.6) errores.add(`cabeza en ${accion}`);
+          if (h.y > 0.26 && rad < 0.76) errores.add(`pelo en ${accion}`);
+          // brazos: cápsulas del hombro al codo y del codo a la muñeca
+          for (const [hombro, lado] of brazos) {
+            const q = hombro.worldToLocal(v.clone());
+            const p0 = new THREE.Vector3(0, 0, 0);
+            const p1 = new THREE.Vector3(lado * 0.11, -0.62, 0);
+            const p2 = new THREE.Vector3(lado * 0.11, -0.62 - 0.5 * codo, 0.5 * Math.sin(0.62));
+            if (dSeg(q, p0, p1) < 0.26 || dSeg(q, p1, p2) < 0.235) errores.add(`brazo en ${accion}`);
+          }
+        }
+      };
+      const casos = [['thinking', 'teclear'], ['thinking', 'pensar'], ['thinking', 'idea'], ['thinking', 'anotar'], ['talking', 'hablar'], ['escucha', 'notas'], ['searching', 'escanear'], ['terminado', 'festejo'], ['idle', 'pelo'], ['idle', 'saludar'], ['idle', 'estirarse'], ['idle', 'tamborilear'], ['idle', 'repasar'], ['idle', 'reposo']];
+      let t = 5000;
+      for (const sentado of [true, false]) {
+        fig.sentar(sentado, true);
+        for (const [estado, accion] of casos) {
+          fig.fijarAccion(accion);
+          for (let i = 0; i < 75; i++) {
+            fig.animar(estado, (t += 1 / 30), 1 / 30);
+            if (i % 3 === 0) revisar(accion);
+          }
+        }
+        fig.fijarAccion(null);
+        fig.velocidad = 8;
+        for (let i = 0; i < 60; i++) {
+          fig.animar('walking', (t += 1 / 30), 1 / 30);
+          if (i % 3 === 0) revisar('caminar');
+        }
+        fig.velocidad = 0;
+      }
+      fig.sentar(true, true);
+      fig.animar('idle', (t += 1), 1);
+      return [...errores];
+    });
+    if (r.length) throw new Error('atraviesa: ' + r.join(', '));
+    return '14 acciones + caminar, sentado y parado: libre de cabeza, pelo y brazos';
+  });
+
+  await paso('NICO · presupuesto: triángulos y llamadas de dibujo por calidad', async () => {
+    const r = await page.evaluate(async () => {
+      const O = window.oficina3d;
+      const medir = () => {
+        let tri = 0;
+        let mallas = 0;
+        O.agentes.agentes.copy.fig.objeto.traverse((o) => {
+          if (!o.isMesh || !o.visible) return;
+          let vis = true;
+          for (let p = o.parent; p; p = p.parent) if (!p.visible) vis = false;
+          if (!vis) return;
+          mallas++;
+          tri += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+        });
+        return { tri, mallas, escena: O.medir() };
+      };
+      O.aplicarCalidad('alta');
+      const alta = medir();
+      O.aplicarCalidad('media');
+      const media = medir();
+      O.aplicarCalidad('alta');
+      return { alta, media };
+    });
+    if (r.alta.tri > 25000) throw new Error('Alta: ' + r.alta.tri);
+    if (r.media.tri > 8000) throw new Error('Media: ' + r.media.tri);
+    if (r.alta.mallas > 22) throw new Error('llamadas de Nico: ' + r.alta.mallas);
+    if (r.alta.escena.calls >= 150 || r.alta.escena.triangulos >= 300000 || r.media.escena.triangulos >= 120000) throw new Error(JSON.stringify(r));
+    return `Nico: Alta ${r.alta.tri} triángulos / ${r.alta.mallas} llamadas · Media ${r.media.tri} · escena Alta ${r.alta.escena.calls} llamadas / ${(r.alta.escena.triangulos / 1000).toFixed(0)} mil · Media ${(r.media.escena.triangulos / 1000).toFixed(0)} mil`;
+  });
+
+  await paso('NICO · "Pensando…": teclea → piensa → idea → anota en la libreta → teclea; la utilería solo al anotar', async () => {
+    const m = await page.evaluate(() => {
+      const O = window.oficina3d;
+      O.fuente.chat('copy').push({ role: 'user', text: 'x' }, { role: 'model', text: '', pending: true });
+      O.fuente.setStatus('copy', 'thinking');
+      const g = window.__nico.grabar(16);
+      return g;
+    });
+    const orden = m.map((f) => f.acc).filter((x, i, arr) => x !== arr[i - 1]);
+    const esperado = ['teclear', 'pensar', 'idea', 'anotar', 'teclear'];
+    if (JSON.stringify(orden.slice(0, 5)) !== JSON.stringify(esperado)) throw new Error('orden: ' + orden.join(' → '));
+    if (m.some((f) => f.acc !== 'anotar' && f.lib > 0.5)) throw new Error('libreta fuera de "anotar"');
+    if (!m.some((f) => f.acc === 'anotar' && f.lib > 0.99 && f.boli > 0.99)) throw new Error('no aparecieron libreta y bolígrafo');
+    if (m.some((f) => !f.senal)) throw new Error('el bombillo no se vio todo el tiempo al pensar');
+    if (m.some((f) => f.globo !== 'Pensando…')) throw new Error('globo distinto a "Pensando…"');
+    const idea = m.find((f) => f.acc === 'idea' && f.E.redondo > 0.6 && f.E.ojo > 1.15);
+    if (!idea) throw new Error('la cara de idea no apareció');
+    const anota = m.filter((f) => f.acc === 'anotar' && f.lib > 0.99);
+    if (!anota.some((f) => f.E.lengua > 0.6)) throw new Error('sin cara de concentración al anotar');
+    return orden.slice(0, 5).join(' → ');
+  });
+
+  await paso('NICO · si llega texto real ("Escribiendo…") deja la libreta y teclea rápido', async () => {
+    const r = await page.evaluate(() => {
+      const O = window.oficina3d;
+      const a = window.__nico.a();
+      // espera a que esté anotando
+      let n = 0;
+      while (a.fig.accion() !== 'anotar' && n++ < 1200) O.avanzar(1 / 30);
+      window.__nico.grabar(0.8);
+      const chat = O.fuente.chat('copy');
+      chat.at(-1).text = 'Hola, aquí va el copy';
+      O.fuente.emit('chat', { agentId: 'copy', type: 'update' });
+      const g = window.__nico.grabar(0.5);
+      chat.at(-1).pending = false;
+      O.fuente.setStatus('copy', 'idle');
+      const fin = window.__nico.grabar(2.5);
+      return { antes: n, g, fin: fin.map((f) => ({ anim: f.anim, lib: f.lib })) };
+    });
+    if (r.g[0].acc !== 'teclear') throw new Error('siguió en ' + r.g[0].acc);
+    if (r.g[0].globo !== 'Escribiendo…') throw new Error('globo ' + r.g[0].globo);
+    if (r.g.at(-1).lib > 0.01 || r.g.at(-1).boli > 0.01) throw new Error('la libreta no se guardó');
+    if (!r.fin.some((f) => f.anim === 'terminado')) throw new Error('no hizo el gesto de terminado');
+    if (r.fin.at(-1).anim !== 'idle') throw new Error('no volvió al reposo');
+    return `teclea en el primer cuadro; libreta guardada en ${(r.g.findIndex((f) => f.lib < 0.01) + 1) / 30} s; festejo y reposo`;
+  });
+
+  await paso('NICO · festejo: dura 1,7 s, cara feliz y alterna dos variantes', async () => {
+    const r = await page.evaluate(() => {
+      const fig = window.__nico.a().fig;
+      const vuelta = () => {
+        let fin = null;
+        let feliz = 0;
+        let brazos = 0;
+        fig.animar('idle', 100, 1 / 30);
+        for (let i = 0; i < 90; i++) {
+          if (fig.animar('terminado', 100 + i / 30, 1 / 30) && fin === null) fin = i / 30;
+          feliz = Math.max(feliz, fig.expresion().feliz);
+          brazos = Math.max(brazos, -fig.objeto.getObjectByName('hombroI').rotation.x);
+        }
+        fig.animar('idle', 104, 1 / 30);
+        return { fin, feliz, brazos };
+      };
+      return [vuelta(), vuelta()];
+    });
+    for (const v of r) {
+      if (v.fin === null || Math.abs(v.fin - 1.7) > 0.05) throw new Error('duración ' + v.fin);
+      if (v.feliz < 0.8) throw new Error('sin cara feliz');
+    }
+    if (!(r[0].brazos > 1.5) === !(r[1].brazos > 1.5)) throw new Error('no alterna variantes: ' + JSON.stringify(r));
+    return 'puño arriba y estirón con los dos brazos, alternados';
+  });
+
+  await paso('NICO · reunión: al escuchar a veces toma notas; al hablar mueve la boca por sílabas y a veces en "O"', async () => {
+    const r = await page.evaluate(() => {
+      const fig = window.__nico.a().fig;
+      const acciones = new Set();
+      let lib = 0;
+      for (let i = 0; i < 30 * 40; i++) {
+        fig.animar('escucha', 200 + i / 30, 1 / 30);
+        acciones.add(fig.accion());
+        if (fig.accion() === 'notas') lib = Math.max(lib, fig.utileria().libreta);
+      }
+      let bmin = 1;
+      let bmax = 0;
+      let redondo = 0;
+      for (let i = 0; i < 30 * 12; i++) {
+        fig.animar('talking', 300 + i / 30, 1 / 30);
+        const E = fig.expresion();
+        if (fig.accion() === 'hablar') {
+          bmin = Math.min(bmin, E.boca);
+          bmax = Math.max(bmax, E.boca);
+          redondo = Math.max(redondo, E.redondo);
+        }
+      }
+      fig.animar('idle', 400, 1 / 30);
+      return { acciones: [...acciones], lib, bmin, bmax, redondo };
+    });
+    if (!r.acciones.includes('notas') || r.lib < 0.99) throw new Error('no tomó notas: ' + JSON.stringify(r));
+    if (!(r.bmax - r.bmin > 0.45)) throw new Error('boca casi quieta: ' + JSON.stringify(r));
+    if (!(r.redondo > 0.35)) throw new Error('nunca en "O"');
+    return `escucha: ${r.acciones.join(', ')} · boca ${r.bmin.toFixed(2)}–${r.bmax.toFixed(2)}`;
+  });
+
+  await paso('NICO · reposo: acciones de vida (pelo, saludar, estirarse, tamborilear, repasar) sin libreta fuera de "repasar"', async () => {
+    const r = await page.evaluate(() => {
+      const fig = window.__nico.a().fig;
+      const vistas = new Set();
+      let malo = null;
+      for (let i = 0; i < 30 * 90; i++) {
+        fig.animar('idle', 500 + i / 30, 1 / 30);
+        const acc = fig.accion();
+        vistas.add(acc);
+        if (fig.utileria().libreta > 0.5 && acc !== 'repasar') malo = acc;
+        if (fig.utileria().boligrafo > 0.5) malo = acc + ' (bolígrafo)';
+      }
+      return { vistas: [...vistas], malo };
+    });
+    const extras = r.vistas.filter((x) => x !== 'reposo');
+    if (extras.length < 3) throw new Error('pocas acciones: ' + r.vistas.join(', '));
+    if (r.malo) throw new Error('utilería fuera de lugar en ' + r.malo);
+    return r.vistas.join(', ');
+  });
+
+  await paso('NICO · sentado: ninguna acción atraviesa el escritorio ni la silla', async () => {
+    const r = await page.evaluate(() => {
+      const O = window.oficina3d;
+      const THREE = O.THREE;
+      const a = window.__nico.a();
+      const fichas = O.salas.copy.userData.modelos;
+      const desk = fichas.find((m) => m.item.modelo === 'escritorio').cajaMundo;
+      const sc = fichas.find((m) => m.item.modelo === 'silla').objeto.position;
+      const respaldo = new THREE.Box3(new THREE.Vector3(sc.x - 1.2, 1.7, sc.z - 1.3), new THREE.Vector3(sc.x + 1.2, 4.7, sc.z - 0.72));
+      const choques = [];
+      const v = new THREE.Vector3();
+      for (const [estado, accion] of [['thinking', 'teclear'], ['thinking', 'pensar'], ['thinking', 'idea'], ['thinking', 'anotar'], ['idle', 'pelo'], ['idle', 'saludar'], ['idle', 'estirarse'], ['idle', 'tamborilear'], ['idle', 'repasar'], ['searching', 'escanear'], ['terminado', 'festejo']]) {
+        a.fig.fijarAccion(accion);
+        let peor = 0;
+        for (let i = 0; i < 75; i++) {
+          a.fig.animar(estado, 600 + i / 30, 1 / 30);
+          if (i % 5) continue;
+          a.contenedor.updateMatrixWorld(true);
+          a.fig.objeto.traverse((o) => {
+            if (!o.isMesh || o.parent?.name === 'senal' || o.parent?.parent?.name === 'senal') return;
+            for (let p = o; p; p = p.parent) if (!p.visible) return;
+            // vértices reales (no la caja de la malla entera): una mano sobre el teclado no es un choque
+            const pos = o.geometry.attributes.position;
+            for (let k = 0; k < pos.count; k += 3) {
+              v.fromBufferAttribute(pos, k).applyMatrix4(o.matrixWorld);
+              if (v.y < desk.max.y - 0.12 && desk.containsPoint(v)) peor = Math.max(peor, desk.max.y - v.y);
+              if (respaldo.containsPoint(v)) peor = Math.max(peor, 9);
+            }
+          });
+        }
+        if (peor) choques.push(`${accion} (${peor.toFixed(2)})`);
+      }
+      a.fig.fijarAccion(null);
+      a.fig.animar('idle', 700, 1);
+      return choques;
+    });
+    if (r.length) throw new Error('atraviesa: ' + r.join(', '));
+    return '11 acciones revisadas vértice a vértice';
+  });
+
+  await paso('NICO · caminata: arranca y frena con rampa, misma duración del SVG, pasos según la velocidad', async () => {
+    const r = await page.evaluate(async () => {
+      const O = window.oficina3d;
+      const a = window.__nico.a();
+      O.fuente.runtime.location.copy = 'meeting';
+      const g = [];
+      let t = 0;
+      while (t < 8) {
+        O.avanzar(1 / 30);
+        t += 1 / 30;
+        g.push({ t, anim: a.anim, vel: a.fig.velocidad, pierna: a.fig.objeto.getObjectByName('piernaI').rotation.x });
+        if (t > 0.5 && a.anim !== 'walking' && g.at(-2)?.anim === 'walking') break;
+      }
+      O.fuente.runtime.location.copy = 'office';
+      for (let i = 0; i < 300; i++) O.avanzar(1 / 30);
+      return g;
+    });
+    const caminando = r.filter((f) => f.anim === 'walking');
+    const dur = caminando.length / 30;
+    const esperado = plano.duracionCaminata('copy', 'meeting') / 1000;
+    if (Math.abs(dur - esperado) > 0.1) throw new Error(`duró ${dur.toFixed(2)} s (SVG ${esperado.toFixed(2)} s)`);
+    const v = caminando.map((f) => f.vel);
+    const pico = Math.max(...v);
+    if (!(v[1] < pico * 0.5 && v.at(-2) < pico * 0.5)) throw new Error('sin rampa: ' + v.slice(0, 4).map((x) => x.toFixed(1)).join(','));
+    const medio = caminando.slice(Math.floor(caminando.length * 0.2), Math.floor(caminando.length * 0.8));
+    const amp = Math.max(...medio.map((f) => Math.abs(f.pierna)));
+    if (amp < 0.3) throw new Error('piernas casi quietas: ' + amp);
+    return `${dur.toFixed(2)} s (SVG ${esperado.toFixed(2)} s) · velocidad pico ${pico.toFixed(1)} · zancada ±${amp.toFixed(2)} rad`;
+  });
+
+  await paso('NICO · movimiento reducido: postura fija, sin utilería ni oscilaciones', async () => {
+    const m = await abrir('?calidad=media', { reducido: true, w: 900, h: 600 });
+    const r = await m.page.evaluate(() => {
+      const O = window.oficina3d;
+      O.pasoManual(true);
+      O.fuente.setStatus('copy', 'thinking');
+      const a = O.agentes.agentes.copy;
+      const muestras = [];
+      for (let i = 0; i < 300; i++) {
+        O.avanzar(1 / 30);
+        muestras.push([a.fig.accion(), a.fig.utileria().libreta, a.fig.manoDer.rotation.x, a.fig.cabeza.rotation.x]);
+      }
+      O.fuente.setStatus('copy', 'idle');
+      return muestras;
+    });
+    await m.ctx.close();
+    if (r.some((x) => x[0] !== 'teclear' || x[1] > 0)) throw new Error('cambió de acción o mostró la libreta');
+    if (r.some((x) => Math.abs(x[2] - r[0][2]) > 1e-6 || Math.abs(x[3] - r[0][3]) > 1e-6)) throw new Error('se mueve');
+    return '10 s de "Pensando…": teclea quieto, sin libreta';
+  });
+
+  await paso('NICO · capturas (anotar, idea, festejo, caminar, reunión)', async () => {
+    for (const [nombre, estado, accion, pasos] of [['anotar', 'thinking', 'anotar', 40], ['idea', 'thinking', 'idea', 12], ['festejo', 'terminado', 'festejo', 20], ['pensar', 'thinking', 'pensar', 30]]) {
+      await page.evaluate(([estado, accion, pasos]) => {
+        const O = window.oficina3d;
+        const a = window.__nico.a();
+        O.enfocar('copy', 0);
+        a.fig.fijarAccion(accion);
+        for (let i = 0; i < pasos; i++) a.fig.animar(estado, 800 + i / 30, 1 / 30);
+        O.medir();
+      }, [estado, accion, pasos]);
+      await page.screenshot({ path: `${CAPTURAS}nico-${nombre}.png` });
+    }
+    await page.evaluate(() => {
+      const a = window.__nico.a();
+      a.fig.fijarAccion(null);
+      a.fig.animar('idle', 900, 1);
+    });
+    return 'guardadas';
+  });
+
+  await paso('NICO · costo de la lógica por cuadro (navegador de pruebas; no son FPS reales)', async () => {
+    const r = await page.evaluate(() => {
+      const fig = window.__nico.a().fig;
+      const medir = (estado) => {
+        const t0 = performance.now();
+        for (let i = 0; i < 300; i++) fig.animar(estado, 1000 + i / 30, 1 / 30);
+        return (performance.now() - t0) / 300;
+      };
+      const out = { hablar: medir('talking'), pensar: medir('thinking'), caminar: medir('walking'), reposo: medir('idle') };
+      fig.animar('idle', 2000, 1);
+      return out;
+    });
+    const peor = Math.max(...Object.values(r));
+    if (peor > 2) throw new Error(JSON.stringify(r));
+    return Object.entries(r).map(([k, v]) => `${k} ${v.toFixed(2)} ms`).join(' · ') + ' (incluye redibujar la cara)';
+  });
+  await ctx.close();
 }
 
 await browser.close();

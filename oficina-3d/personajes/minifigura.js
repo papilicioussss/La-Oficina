@@ -48,6 +48,7 @@ function semilla(n) {
 
 // Mano LEGO en C (copiada de la prueba), con caché por lado y detalle
 const manos = new Map();
+export { semilla };
 function geometriaMano(lado, liviana) {
   const k = `${lado}:${liviana}`;
   if (manos.has(k)) return manos.get(k);

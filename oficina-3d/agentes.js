@@ -17,12 +17,15 @@
 // Señales del kit (como en el SVG): bombillo de Nico al pensar, lupa de Alex al buscar, ✓ de Sam al terminar.
 import * as THREE from 'three';
 import './personajes/minifigura.js'; // registra el modelo 'minifigura'
+import './personajes/nico.js'; // registra el modelo 'nico' (Nico en alta calidad, con su utilería)
 import { crearModelo } from './registro.js';
 import { aparienciaAgentes } from './personajes/apariencia.js';
 import { lienzo } from './texturas.js';
 import { AGENT_IDS, SEATS, MEET, STATUS_LABEL, aMundo, duracionCaminata, recorrido3D } from './plano.js';
 
 const SEMILLAS = { copy: 3, analista: 11, guion: 7 };
+// Modelo de cada agente: Nico tiene su modelo propio; los demás, la minifigura general.
+const MODELOS = { copy: 'nico' };
 const ESCRIBIENDO_MS = 700; // igual que office.js
 const SENTARSE_S = 0.4; // se levanta al empezar a caminar y se sienta al llegar, dentro del tiempo del SVG
 
@@ -57,6 +60,16 @@ function anillo() {
 
 const angulo = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
+// Perfil de velocidad trapezoidal: acelera en el primer 18 % del tiempo y frena en el último 18 %.
+const RAMPA = 0.18;
+const VMAX = 1 / (1 - RAMPA);
+function rampa(k) {
+  if (k < RAMPA) return (VMAX * k * k) / (2 * RAMPA);
+  if (k > 1 - RAMPA) return 1 - (VMAX * (1 - k) ** 2) / (2 * RAMPA);
+  return VMAX * (k - RAMPA / 2);
+}
+const rampaVel = (k) => VMAX * Math.min(1, k / RAMPA, (1 - k) / RAMPA);
+
 export function crearAgentes(escena, { fuente, liviana = false, sombrasReales = false, reducido = false, alCambiarAnalista, etiquetas } = {}) {
   const grupo = new THREE.Group();
   grupo.name = 'agentes';
@@ -66,7 +79,7 @@ export function crearAgentes(escena, { fuente, liviana = false, sombrasReales = 
   let seleccionado = null;
 
   function construir(id, a) {
-    const modelo = crearModelo('minifigura', { look: apariencia[id].look, liviana, semilla: SEMILLAS[id] });
+    const modelo = crearModelo(MODELOS[id] || 'minifigura', { look: apariencia[id].look, liviana, semilla: SEMILLAS[id] });
     const fig = modelo.objeto.children[0].userData.personaje;
     modelo.objeto.traverse((o) => {
       if (o.isMesh) o.castShadow = sombrasReales;
@@ -175,7 +188,10 @@ export function crearAgentes(escena, { fuente, liviana = false, sombrasReales = 
     const c = a.camino;
     c.t += dt * 1000;
     const k = Math.min(1, c.t / c.ms);
-    let d = k * c.total;
+    // con suavizarCaminata (Nico) arranca y frena con rampa; la duración total es la misma del SVG
+    const pk = a.fig.suavizarCaminata ? rampa(k) : k;
+    if ('velocidad' in a.fig) a.fig.velocidad = (c.total / (c.ms / 1000)) * (a.fig.suavizarCaminata ? rampaVel(k) : 1) * (k < 1 ? 1 : 0);
+    let d = pk * c.total;
     let i = 0;
     while (i < c.largos.length - 1 && d > c.largos[i]) d -= c.largos[i++];
     const p0 = c.puntos[i];

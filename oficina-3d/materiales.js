@@ -51,6 +51,21 @@ export function porVertice(tipo) {
   });
 }
 
+/**
+ * Plástico estampado con una trama (tela de la sudadera, camuflaje del pantalón): colores por vértice multiplicados por
+ * una textura en gris que se repite. Permite juntar en una malla piezas de distinto color con la misma trama.
+ */
+export function trama(clave, textura) {
+  return guardar(`trama:${clave}`, () => {
+    textura.colorSpace = THREE.SRGBColorSpace;
+    textura.wrapS = textura.wrapT = THREE.RepeatWrapping;
+    textura.anisotropy = 4;
+    const m = new THREE.MeshPhysicalMaterial({ map: textura, vertexColors: true, roughness: 0.5, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.5, envMapIntensity: 0.32 });
+    m.userData.trama = clave;
+    return m;
+  });
+}
+
 /** Plástico translúcido (vidrio de ventana, pantallas). */
 export function translucido(color, opacidad = 0.35) {
   return guardar(`t:${color}:${opacidad}`, () => new THREE.MeshPhysicalMaterial({ color, roughness: 0.08, transparent: true, opacity: opacidad, clearcoat: 1, clearcoatRoughness: 0.05, depthWrite: false }));

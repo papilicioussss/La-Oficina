@@ -74,12 +74,14 @@ Los tres agentes (Nico, Alex y Sam) aparecen como minifiguras sentadas en su ofi
 | `personajes/minifigura.js` | Minifigura de la prueba (copiada) con postura sentada, versión liviana y señal del kit; se registra como modelo `minifigura` |
 | `personajes/cara.js` | Cara estampada (copia sin cambios de `prueba-3d/cara.js`) |
 | `personajes/accesorios.js` | Peinados (`hair()`) y kits (`kitParts()`) de la oficina SVG en 3D: sudaderas, saco, gorra, audífonos, lentes, libreta, tableta, tarjetas y señales (bombillo, lupa, ✓) |
+| `personajes/nico.js` | Nico como minifigura LEGO real (modelo propio `nico`): piezas, ropa impresa, pelo esculpido, capucha, utilería y sus acciones |
+| `personajes/cara-nico.js` | Cara de Nico al estilo de las caras LEGO, redibujable con todas sus expresiones |
 | `personajes/apariencia.js` | Apariencia por defecto (copiada de `js/store.js`) y, si existe, la guardada por la app (solo lectura) |
 | `agentes.js` | Controla a los tres: estados → animación, "Escribiendo…", gesto de terminado, caminatas, miradas en reunión, señales, selección |
 | `fuente-estados.js` | Única entrada de estados (misma forma que `js/state.js`: `runtime`, `on('status')`, `on('chat')`, `chat(id)`) |
 | `simulador.js` | Herramienta de prueba que reproduce las secuencias reales de `conversation.js` y `meeting.js` |
 | `etiquetas.js` | Nombres y globos en HTML sobre el lienzo, con los textos exactos de la app |
-| `pruebas/personajes.mjs` | Pruebas de las fases 1 a 5 (`FASES=1,2,3,4,5`) |
+| `pruebas/personajes.mjs` | Pruebas de las fases 1 a 5 y de Nico (`FASES=1,2,3,4,5,nico`) |
 
 ## Reglas que replica (de `js/office.js`, sin inventar estados)
 
@@ -105,3 +107,39 @@ Reproduce, en el mismo orden, los `setStatus`, los eventos `chat` y los cambios 
 ## Interfaz de un personaje (para un futuro .glb)
 
 Un modelo de personaje debe entregar en `objeto.userData.personaje`: `animar(estado, t, dt)`, `sentar(si, inmediato)`, `sentado()`, `mirarA(punto)`, `reposo()`, `cabeza` (Object3D), `senal` (Object3D), `ritmoTecleo` y `liberar()`. Los estados son `idle | thinking | searching | talking | walking | escucha | terminado`.
+
+# Nico como minifigura LEGO real (modelo propio)
+
+Nico (copywriter) tiene su propio modelo, `personajes/nico.js`, hecho como una **minifigura LEGO real**: piezas, proporciones y articulaciones auténticas, con la ropa **impresa** y los accesorios como piezas aparte. Se basó en su hoja de referencia, en fotos de minifiguras reales (anatomía) y en el `.glb` de Meshy que mandó el equipo, que no se usa directamente: viene fundido en una sola pieza (sin esqueleto ni animaciones), pesa ~141 mil triángulos y trae la cara pintada. Alex y Sam siguen con la minifigura general.
+
+- **Piezas** (1 = un taquito = 8 mm; 4,8 de alto como una minifigura real):
+  - cabeza de 1,2 × 1,1 con bordes redondeados, cuello y taquito arriba;
+  - torso en trapecio (2,0 abajo y 1,5 en los hombros, 1,6 de alto, frente y espalda planos);
+  - brazos rígidos con hombro redondeado al costado del torso y codo doblado fijo; manos en C con muñeca;
+  - cadera con eje y entrepierna;
+  - piernas con el perfil real: pie adelantado, tope redondeado y dos huecos redondos atrás.
+- **Ropa impresa** (una sola imagen compartida, `atlas()`): sudadera con capucha, cordones, bolsillo canguro y franela; pretina; pantalón cargo con camuflaje y bolsillos; zapatillas impresas en los pies. Cada parte se proyecta como calcomanía según hacia dónde mira (frente, espalda, costado).
+- **Pelo** (pieza aparte, moldeada como el pelo LEGO): casco hueco cuya superficie está esculpida en 11 mechones gruesos y redondeados que nacen en la coronilla y bajan con un barrido, con surcos entre ellos y vetas finas en Alta; cada mechón termina en punta en el borde. El flequillo queda arriba de las cejas, los lados a media cara y la nuca hasta el cuello. Por dentro es liso y más grande que la cabeza: no la atraviesa.
+- **Capucha** (pieza accesorio, como en la hoja de referencia): un rollo que rodea el cuello por los lados y por detrás (abierto adelante, donde se ven la franela y los cordones), grueso y redondo detrás de la nuca, y la capucha que cae sobre la espalda con volumen y termina en punta. Va por fuera de todo: la prueba "la capucha no atraviesa" revisa en todas las acciones (sentado y parado) que deje libres la cabeza, el pelo y los brazos.
+- **Accesorios** (piezas aparte): libreta abierta y bolígrafo.
+- **Articulaciones: solo las reales.** La cabeza gira a los lados, cada brazo gira en el hombro (adelante y atrás), cada mano gira en su muñeca y cada pierna gira en la cadera. La figura completa puede saltar, rebotar, girar e inclinarse entera, como en stop-motion. Nada se dobla ni se abre hacia los lados; mirar arriba o abajo lo hacen los ojos de la cara impresa. La prueba "LEGO estricto" lo verifica en todas las acciones.
+- **Cara** (`personajes/cara-nico.js`): pegatina redibujable al estilo de las caras LEGO (cejas finas, ojos negros con brillito, boca de trazo fino, sonrisa con contorno negro y dientes blancos, marquita en la mejilla) con ojos felices (^ ^), boca en "O", dientes, lengüita de concentración, boca de lado, cachetes rosados, parpadeo y sílabas al hablar.
+- **Peso:** ~21 mil triángulos y 17 llamadas de dibujo en Alta; ~4,5 mil triángulos en Media y Baja (la escena completa: 110 llamadas y ~219 mil triángulos en Alta, ~103 mil en Media).
+- **La apariencia personalizada de la app** (color de camisa, peinado) no cambia el modelo de Nico, que sigue la hoja de referencia; el nombre y el color de su placa sí se leen de la app.
+
+## Acciones de Nico (dentro de los estados reales; no inventan estados)
+
+| Estado de la app | Lo que hace Nico |
+|---|---|
+| `thinking` ("Pensando…") | teclea → se queda pensando (mano levantada junto a la cara, mira arriba) → **idea** (ojos grandes, boca en "O", brazo arriba y un salto, el bombillo late) → **anota en la libreta** con lengüita afuera → vuelve a teclear |
+| `thinking` con texto llegando ("Escribiendo…") | deja lo que esté haciendo (guarda la libreta) y teclea rápido, concentrado |
+| `searching` | se inclina entero hacia la pantalla, gira la cabeza de lado a lado, gira la mano y hace clic |
+| `talking` | gestos con los brazos y giros de muñeca, rebotes cortos en los acentos, boca por sílabas (a veces en "O") con pausas entre frases; a veces consulta la libreta |
+| escuchando en reunión | gira la cabeza hacia quien habla y "asiente" con toda la figura; a veces toma notas y levanta la vista hacia quien habla |
+| reposo | respira, parpadea (a veces doble), mira alrededor; de vez en cuando se pasa la mano por el pelo, saluda, se estira y bosteza, tamborilea o repasa la libreta |
+| terminado bien (1,7 s) | alterna puño arriba con salto y los dos brazos arriba, con ojos felices y cachetes rosados |
+| caminar | piernas y brazos alternados con cadencia según la velocidad real, rebote y balanceo de toda la figura; arranca y frena con rampa (la duración total sigue siendo la del SVG) |
+
+Movimiento reducido: postura fija del estado, sin utilería ni oscilaciones. Las acciones se mezclan con fundidos (postura con resortes amortiguados y oscilaciones que entran y salen suavemente), así no hay saltos al cambiar.
+
+Pruebas: `FASES=nico node oficina-3d/pruebas/personajes.mjs` (incluidas por defecto).
