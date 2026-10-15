@@ -105,10 +105,15 @@ export function crearCaraNico({ fina = true } = {}) {
   };
 
   /** Redibuja con la expresión E; `parpadeo` 0 (abiertos) a 1 (cerrados). Solo si algo cambió. */
-  function actualizar(E, parpadeo = 0) {
+  // Redibujar el lienzo y subirlo a la gráfica cuesta: como mucho 30 veces por segundo (a 60 fps, uno sí y uno no; el
+  // ojo no lo nota en una cara impresa). En reposo la escena ya va a 30, así que el último gesto siempre se dibuja.
+  let ultimoDibujo = -1e9;
+  function actualizar(E, parpadeo = 0, ahora = performance.now()) {
     const abierto = E.ojo * (1 - parpadeo);
     const clave = [abierto, E.feliz, E.cejaIh, E.cejaIt, E.cejaDh, E.cejaDt, E.sonrisa, E.boca, E.redondo, E.dientes, E.lengua, E.ladeo, E.rubor, E.miraX, E.miraY].map((x) => Math.round(x * paso)).join(',');
     if (clave === previo) return false;
+    if (ahora - ultimoDibujo < 30 && ahora >= ultimoDibujo) return false;
+    ultimoDibujo = ahora;
     previo = clave;
     g.setTransform(escala, 0, 0, escala, 0, 0);
     g.clearRect(0, 0, ANCHO, ALTO);

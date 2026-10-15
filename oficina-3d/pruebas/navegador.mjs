@@ -177,31 +177,110 @@ await paso('niveles de calidad: cambian materiales y detalle, y respetan los lí
   return salida.join(' · ');
 });
 
-await paso('calidad automática: baja un nivel solo tras lentitud sostenida y no oscila', async () => {
+await paso('calidad automática: compara con el límite real de la pantalla, baja de a un paso (primero la resolución) y no oscila', async () => {
   const r = await page.evaluate(() => {
-    const O = window.oficina3d;
-    O.aplicarCalidad('alta');
-    const auto = O.auto;
-    const cambios = [];
-    const original = auto.alBajar;
-    auto.alBajar = (c) => cambios.push(c);
-    auto.activa = true;
-    auto.reinicia();
-    auto.pausaHasta = 0;
-    // 1 s lento suelto: no debe bajar
-    for (let i = 0; i < 20; i++) auto.cuadro(60, 'alta');
-    for (let i = 0; i < 120; i++) auto.cuadro(16, 'alta');
-    const trasPico = cambios.length;
-    // 8 s seguidos a ~16 fps: debe bajar UNA vez
-    for (let i = 0; i < 130; i++) auto.cuadro(62, 'alta');
-    const trasLento = cambios.slice();
-    auto.alBajar = original;
-    auto.activa = false;
-    return { trasPico, trasLento };
+    const C = window.oficina3d.auto.constructor;
+    let ahora = 0;
+    const crear = (op) => {
+      const cambios = [];
+      const c = new C({ ...op, reloj: () => ahora, alCambiar: (x) => cambios.push(`${x.nivel}@${x.escala}`) });
+      return { c, cambios };
+    };
+    const correr = (c, ms, dt, op) => {
+      for (let t = 0; t < ms; t += dt) {
+        ahora += dt;
+        c.registrar(dt, op);
+      }
+    };
+    const REPOSO = { dibujo: false };
+    const CONTINUO = { dibujo: true, continuo: true };
+    // A · pantalla de 60 Hz
+    const a = crear({ nivel: 'alta' });
+    correr(a.c, 2500, 16.7, REPOSO);
+    const refrescoA = a.c.refresco;
+    correr(a.c, 3000, 16.7, CONTINUO);
+    correr(a.c, 1000, 62, CONTINUO); // un segundo lento suelto
+    correr(a.c, 3000, 16.7, CONTINUO);
+    const trasPico = a.cambios.length;
+    correr(a.c, 4500, 50, CONTINUO); // lento sostenido (20 fps)
+    const trasLento = a.cambios.slice();
+    // B · navegador limitado a 30 fps (ahorro de energía): en reposo dibuja en TODOS los cuadros (30 de 30) y aun así
+    // detecta el límite; 28 fps es normal ahí, no debe bajar nada
+    const b = crear({ nivel: 'alta' });
+    correr(b.c, 2500, 33.4, { dibujo: true, continuo: false });
+    correr(b.c, 12000, 35.7, CONTINUO);
+    // B2 · sin haber medido el límite todavía (trabajo continuo desde el arranque) no decide en los primeros 6 s…
+    const b2 = crear({ nivel: 'alta' });
+    correr(b2.c, 5500, 35.7, CONTINUO);
+    // … pero si nunca hay un segundo liviano (equipo muy lento), después asume 60 Hz y baja igual
+    const b3 = crear({ nivel: 'baja' });
+    correr(b3.c, 12000, 300, CONTINUO);
+    // C · sube con holgura sostenida (resolución primero) sin pasar del techo
+    const d = crear({ nivel: 'media', techo: 'media' });
+    d.c.fijar('media', 2);
+    correr(d.c, 2500, 16.7, REPOSO);
+    correr(d.c, 12000, 16.7, CONTINUO);
+    const subidas = d.cambios.slice();
+    // D · si al subir se pone lento, vuelve a bajar y deja de intentar subir un minuto (no oscila)
+    correr(d.c, 4500, 50, CONTINUO);
+    const nBaja = d.cambios.length;
+    correr(d.c, 30000, 16.7, CONTINUO);
+    const sinOscilar = nBaja === subidas.length + 1 && d.cambios.length === nBaja;
+    // E · ya en su techo (nivel inicial, resolución completa) no sube más
+    const e = crear({ nivel: 'media', techo: 'media' });
+    correr(e.c, 2500, 16.7, REPOSO);
+    correr(e.c, 40000, 16.7, CONTINUO);
+    const techo = e.cambios.slice();
+    return { refrescoA, trasPico, trasLento, refrescoB: b.c.refresco, cambiosB: b.cambios, cambiosB2: b2.cambios, cambiosB3: b3.cambios, subidas, techo, sinOscilar, texto: a.c.texto() };
   });
+  if (r.refrescoA !== 60) throw new Error('no detectó 60 Hz: ' + r.refrescoA);
   if (r.trasPico !== 0) throw new Error('bajó por un pico aislado');
-  if (r.trasLento.length !== 1 || r.trasLento[0] !== 'media') throw new Error('cambios: ' + JSON.stringify(r.trasLento));
-  return 'un pico no la cambia; 6 s lentos bajan de Alta a Media una sola vez';
+  if (JSON.stringify(r.trasLento) !== JSON.stringify(['alta@0.85'])) throw new Error('lento sostenido: ' + JSON.stringify(r.trasLento));
+  if (r.refrescoB !== 30 || r.cambiosB.length) throw new Error('a 30 fps de límite bajó igual: ' + JSON.stringify(r));
+  if (r.cambiosB2.length) throw new Error('decidió sin conocer el límite de la pantalla: ' + JSON.stringify(r.cambiosB2));
+  if (r.cambiosB3[0] !== 'baja@0.85') throw new Error('equipo muy lento sin límite medido: ' + JSON.stringify(r.cambiosB3));
+  if (r.subidas[0] !== 'media@0.85') throw new Error('subida: ' + JSON.stringify(r.subidas));
+  if (r.techo.length) throw new Error('pasó del techo: ' + JSON.stringify(r.techo));
+  if (!r.sinOscilar) throw new Error('oscila');
+  return `detecta el límite de la pantalla (60 Hz / 30 en ahorro de energía) · un pico no cambia nada · lento sostenido → resolución 85 % · a 30 fps de límite no baja · sube con holgura sin pasar del techo · no oscila · medidor: "${r.texto}"`;
+});
+
+await paso('resolución interna: tope de píxeles en monitores grandes (Full HD, 1440p, 4K)', async () => {
+  const salida = [];
+  for (const [w, h] of [[1920, 1080], [2560, 1440], [3840, 2160]]) {
+    const m = await abrir('?calidad=alta', { w, h });
+    const r = await m.page.evaluate(() => {
+      const O = window.oficina3d;
+      const alta = O.resolucion();
+      O.aplicarCalidad('media');
+      const media = O.resolucion();
+      O.aplicarCalidad('baja');
+      const baja = O.resolucion();
+      return { alta, media, baja };
+    });
+    await m.ctx.close();
+    const px = (x) => x.ancho * x.alto;
+    if (px(r.alta) > 3.75e6 || px(r.media) > 2.25e6 || px(r.baja) > 1.33e6) throw new Error(`${w}×${h}: ${JSON.stringify(r)}`);
+    salida.push(`${w}×${h} → ${(px(r.alta) / 1e6).toFixed(1)} / ${(px(r.media) / 1e6).toFixed(1)} / ${(px(r.baja) / 1e6).toFixed(1)} Mpx`);
+  }
+  return salida.join(' · ') + ' (Alta / Media / Baja)';
+});
+
+await paso('sin aceleración gráfica: se detecta, arranca en Baja sin suavizado y avisa cómo activarla', async () => {
+  // este navegador de pruebas dibuja por software (SwiftShader): es justo el caso a detectar
+  const m = await abrir('');
+  const r = await m.page.evaluate(() => {
+    const O = window.oficina3d;
+    return { gpu: O.gpu, nivel: O.nivel(), res: O.resolucion(), aviso: !document.getElementById('aviso-gpu').hidden, texto: document.getElementById('gpu').textContent };
+  });
+  await m.ctx.close();
+  const n = await abrir('?gpu=normal');
+  const sinAviso = await n.page.evaluate(() => document.getElementById('aviso-gpu').hidden);
+  await n.ctx.close();
+  if (!r.gpu.software) throw new Error('no detectó el dibujo por software: ' + r.gpu.nombre);
+  if (r.nivel !== 'baja' || r.res.antialias || !r.aviso) throw new Error(JSON.stringify(r));
+  if (!sinAviso) throw new Error('?gpu=normal no quitó el aviso');
+  return `${r.texto} → Baja, sin suavizado, aviso visible · ?gpu=normal lo ignora`;
 });
 
 await paso('cámara: límites de zoom, de inclinación y de desplazamiento', async () => {

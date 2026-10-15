@@ -30,6 +30,9 @@
       #aviso a { font-weight: 600; }
       #cargando { position: fixed; inset: 0; display: grid; place-content: center; font-size: 15px; opacity: 0.7; pointer-events: none; }
       [hidden] { display: none !important; }
+      .aviso-gpu { position: fixed; right: 12px; top: 12px; max-width: min(380px, calc(100vw - 24px)); padding: 10px 12px; border-radius: 12px; font-size: 13px; background: #fff4d6; color: #4a3600; border: 1px solid #e8c766; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+      .aviso-gpu button { margin-top: 8px; display: block; }
+      @media (max-width: 600px) { .aviso-gpu { top: auto; bottom: 34px; } }
       .etiquetas { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
       .etiqueta { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; will-change: transform; }
       .etiqueta .placa { font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; padding: 3px 9px; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
@@ -70,8 +73,14 @@
         <a id="enlace-depurar" href="?depurar=1">Ver herramientas de depuración</a>
         <a href="?simular=1">Probar estados (simulador)</a>
       </div>
+      <p id="gpu"></p>
       <div class="fila"><a href="../">← Volver a La Oficina</a></div>
     </details>
+    <div id="aviso-gpu" class="aviso-gpu" hidden role="status">
+      <strong>Tu navegador está dibujando la oficina sin la tarjeta gráfica</strong> (aceleración por hardware desactivada o no disponible), por eso va lenta.
+      En Chrome o Edge: Configuración → Sistema → activa «Usar aceleración de gráficos cuando esté disponible» y reinicia el navegador.
+      <button type="button" onclick="this.parentElement.hidden = true">Entendido</button>
+    </div>
     <div class="pie"><span id="estado-calidad"></span><span id="resumen"></span><span id="fps"></span></div>
     <div id="aviso" hidden role="alert">
       <strong id="aviso-titulo">Este navegador no puede mostrar la oficina en 3D.</strong>

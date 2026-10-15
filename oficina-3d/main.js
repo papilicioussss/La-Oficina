@@ -10,7 +10,7 @@ import { construirParedes, actualizarParedes } from './componentes/paredes.js';
 import { decorar } from './componentes/decoracion.js';
 import { construirSalas } from './salas.js';
 import { crearCamara, LIMITES, CENTRO } from './camara.js';
-import { NIVELES, nivelInicial, CalidadAutomatica } from './calidad.js';
+import { NIVELES, nivelInicial, proporcionPixeles, CalidadAutomatica } from './calidad.js';
 import { construirDepuracion } from './depuracion.js';
 import { crearAgentes } from './agentes.js';
 import { crearFuente } from './fuente-estados.js';
@@ -26,14 +26,30 @@ const params = new URLSearchParams(location.search);
 const depurar = params.get('depurar') === '1';
 const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function soportaWebGL() {
+/**
+ * ¿Hay WebGL? ¿Con qué gráfica? ¿Está dibujando por software (sin tarjeta gráfica)? El dibujo por software ocurre
+ * cuando el navegador tiene desactivada la aceleración por hardware o la gráfica está bloqueada: es MUCHO más lento.
+ * `?gpu=normal` ignora la detección (depuración).
+ */
+function infoGPU() {
   try {
     const c = document.createElement('canvas');
-    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) return null;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const nombre = String((ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || 'desconocida');
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    // el navegador también avisa si el contexto tendría un "rendimiento muy reducido" (dibujo por software)
+    const c2 = document.createElement('canvas');
+    const lento = !(c2.getContext('webgl2', { failIfMajorPerformanceCaveat: true }) || c2.getContext('webgl', { failIfMajorPerformanceCaveat: true }));
+    const porNombre = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic|mesa offscreen/i.test(nombre);
+    const software = params.get('gpu') !== 'normal' && (porNombre || lento);
+    return { nombre: nombre.replace(/^ANGLE \((.*)\)$/, '$1'), software };
   } catch {
-    return false;
+    return null;
   }
 }
+const gpu = infoGPU();
 
 function fallar(titulo, detalle) {
   window.avisoOficina3d?.(titulo, detalle);
@@ -41,7 +57,7 @@ function fallar(titulo, detalle) {
 }
 
 try {
-  if (!soportaWebGL()) throw Object.assign(new Error('sin WebGL'), { aviso: ['Este navegador no puede mostrar la oficina en 3D (WebGL no está disponible).', 'Puedes seguir usando la oficina de siempre.'] });
+  if (!gpu) throw Object.assign(new Error('sin WebGL'), { aviso: ['Este navegador no puede mostrar la oficina en 3D (WebGL no está disponible).', 'Puedes seguir usando la oficina de siempre.'] });
   iniciar();
 } catch (e) {
   console.error(e);
@@ -52,10 +68,13 @@ try {
 function iniciar() {
   // ---------- Calidad ----------
   let pedido = NIVELES[params.get('calidad')] ? params.get('calidad') : 'auto';
-  let nivel = pedido === 'auto' ? nivelInicial() : pedido;
+  let nivel = pedido === 'auto' ? nivelInicial(gpu) : pedido;
+  let escala = 1; // escala dinámica de la resolución interna (la ajusta la calidad automática)
 
   // ---------- Renderizador ----------
-  const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: NIVELES[nivel].antialias, alpha: true, powerPreference: 'high-performance' });
+  // El suavizado de bordes (MSAA) se decide al crear el contexto y no se puede quitar después. Por software es
+  // carísimo (multiplica el costo por píxel), así que ahí no se usa.
+  const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: NIVELES[nivel].antialias && !gpu.software, alpha: true, powerPreference: 'high-performance' });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap; // con `radius` según la calidad (PCFSoft ya no existe en r186)
   renderer.shadowMap.autoUpdate = false; // la escena es fija: las sombras se recalculan solo cuando algo cambia
@@ -97,7 +116,10 @@ function iniciar() {
   decorar(paredes);
   const { grupo: grupoSalas, salas } = construirSalas();
   escena.add(suelos, paredes.grupo, grupoSalas);
-  const piso = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.16 }));
+  // piso exterior que recibe la sombra del edificio: solo del tamaño que esa sombra puede alcanzar (12 de margen),
+  // no 400 × 400: así la gráfica no calcula sombras en todo el fondo de la pantalla
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(LIMITES.x1 - LIMITES.x0 + 24, LIMITES.z1 - LIMITES.z0 + 24), new THREE.ShadowMaterial({ opacity: 0.16 }));
+  piso.position.set(CENTRO.x, 0, CENTRO.z);
   piso.rotation.x = -Math.PI / 2;
   piso.position.y = -1.62;
   piso.receiveShadow = true;
@@ -143,6 +165,8 @@ function iniciar() {
   function redimensionar() {
     const w = lienzo.clientWidth;
     const h = lienzo.clientHeight;
+    // resolución interna: densidad de la pantalla limitada por el nivel y por su tope de píxeles, por la escala dinámica
+    renderer.setPixelRatio(proporcionPixeles({ dpr: devicePixelRatio, ancho: w, alto: h, nivel, escala }));
     renderer.setSize(w, h, false);
     camara.aspect = w / Math.max(1, h);
     camara.updateProjectionMatrix();
@@ -150,10 +174,19 @@ function iniciar() {
     pedirDibujo();
   }
 
-  function aplicarCalidad(clave) {
+  function aplicarCalidad(clave, nuevaEscala = 1, forzar = false) {
+    const mismoNivel = clave === nivel && !primeraVez && !forzar;
+    primeraVez = false;
     nivel = clave;
+    escala = nuevaEscala;
     const n = NIVELES[clave];
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, n.pixeles));
+    if (mismoNivel) {
+      // solo cambia la resolución: no hace falta tocar materiales, sombras ni personajes
+      mostrarEstadoCalidad();
+      redimensionar();
+      pedirDibujo(true);
+      return;
+    }
     sol.shadow.mapSize.set(n.sombra, n.sombra);
     sol.shadow.radius = n.sombraSuave;
     sol.shadow.map?.dispose();
@@ -165,10 +198,15 @@ function iniciar() {
     // minifigura fina en Alta, liviana en Media y Baja; las sombras reales de los personajes solo en Alta y si se piden
     agentes.cambiarDetalle(!n.taquitosFinos, sombrasPersonajes && clave === 'alta');
     $('sombras-reales').disabled = clave !== 'alta';
-    $('calidad').value = pedido === 'auto' ? 'auto' : clave;
-    $('estado-calidad').textContent = `Calidad: ${n.nombre}${pedido === 'auto' ? ' (automática)' : ''}`;
+    mostrarEstadoCalidad();
     redimensionar();
     pedirDibujo(true);
+  }
+  let primeraVez = true;
+  function mostrarEstadoCalidad() {
+    $('calidad').value = pedido === 'auto' ? 'auto' : nivel;
+    const res = escala < 1 ? ` · resolución ${Math.round(escala * 100)} %` : '';
+    $('estado-calidad').textContent = `Calidad: ${NIVELES[nivel].nombre}${pedido === 'auto' ? ' (automática)' : ''}${res}`;
   }
 
   // Sombras de los personajes: de contacto por defecto; reales (mapa de sombras recalculado al moverse) solo en Alta
@@ -176,10 +214,10 @@ function iniciar() {
   $('sombras-reales').checked = sombrasPersonajes;
   $('sombras-reales').addEventListener('change', (e) => {
     sombrasPersonajes = e.target.checked;
-    aplicarCalidad(nivel);
+    aplicarCalidad(nivel, escala, true);
   });
 
-  const auto = new CalidadAutomatica({ alBajar: (clave) => aplicarCalidad(clave) });
+  const auto = new CalidadAutomatica({ alCambiar: (c) => aplicarCalidad(c.nivel, c.escala), nivel, techo: nivel });
   auto.activa = pedido === 'auto';
 
   // ---------- Interfaz ----------
@@ -246,7 +284,10 @@ function iniciar() {
     pedido = e.target.value;
     auto.activa = pedido === 'auto';
     auto.reinicia();
-    aplicarCalidad(pedido === 'auto' ? nivelInicial() : pedido);
+    const clave = pedido === 'auto' ? nivelInicial(gpu) : pedido;
+    auto.techo = clave;
+    auto.fijar(clave, 0);
+    aplicarCalidad(clave, 1);
   });
   const enlace = $('enlace-depurar');
   enlace.href = depurar ? '?' : '?depurar=1';
@@ -271,6 +312,7 @@ function iniciar() {
   lienzo.addEventListener('pointerdown', () => (interactuando = true));
   addEventListener('pointerup', () => (interactuando = false));
   const fps = $('fps');
+  fps.textContent = 'midiendo…';
   function bucle(ahora) {
     const dt = ahora - ultimo;
     ultimo = ahora;
@@ -300,13 +342,15 @@ function iniciar() {
     } else if (quieto) acumulado = 0;
     if (actualizarParedes(paredes.paredes, camara, controles.target, Math.min(0.05, dt / 1000), { inmediato: reducido })) {
       sucio = true;
-      // mientras una pared sube o baja, sus sombras cambian: en Alta cada cuadro, en el resto uno de cada tres
-      if (nivel === 'alta' || ++cuadrosPared % 3 === 0) sombras = true;
+      // mientras una pared sube o baja, sus sombras cambian: se recalculan uno de cada tres cuadros (el mapa de sombras
+      // es lo más caro de dibujar) y una vez más al terminar, para que la sombra final quede exacta
+      if (++cuadrosPared % 3 === 0) sombras = true;
     } else if (cuadrosPared) {
       cuadrosPared = 0;
       sombras = true;
     }
-    if (sucio && !document.hidden) {
+    const dibujo = sucio && !document.hidden;
+    if (dibujo) {
       if (sombras) renderer.shadowMap.needsUpdate = true;
       renderer.render(escena, camara);
       etiquetas.colocar(camara, lienzo.clientWidth, lienzo.clientHeight, posEtiqueta);
@@ -315,13 +359,11 @@ function iniciar() {
       ultima.conSombras = sombras;
       sucio = false;
       sombras = false;
-      // la calidad automática mide mientras se mueve la cámara o algún personaje hace algo real
-      if (interactuando || cam.tween.activo || ocupados) {
-        auto.cuadro(dt, nivel);
-        if (auto.fps) fps.textContent = `${auto.fps.toFixed(0)} fps`;
-      }
       if (!ultima.conSombras) resumen();
     }
+    // medidor y calidad automática: cuentan TODOS los cuadros del navegador; deciden solo con dibujo continuo
+    const continuo = dibujo && (interactuando || cam.tween.activo || ocupados || cuadrosPared > 0);
+    if (auto.registrar(dt, { dibujo, continuo })) fps.textContent = auto.texto();
     requestAnimationFrame(bucle);
   }
   const ultima = { calls: 0, triangulos: 0, conSombras: false };
@@ -330,9 +372,13 @@ function iniciar() {
     v.y += 2.2;
   }
   function resumen() {
-    $('resumen').textContent = `${ultima.calls} dibujos · ${(ultima.triangulos / 1000).toFixed(0)} mil triángulos por cuadro`;
+    const c = renderer.domElement;
+    $('resumen').textContent = `${ultima.calls} dibujos · ${(ultima.triangulos / 1000).toFixed(0)} mil triángulos · ${c.width}×${c.height} px`;
   }
   requestAnimationFrame(bucle);
+  // sin aceleración gráfica: se avisa cómo activarla (la oficina sigue funcionando, en calidad Baja)
+  if (gpu.software) $('aviso-gpu').hidden = false;
+  $('gpu').textContent = `Gráfica: ${gpu.nombre}${gpu.software ? ' (sin aceleración)' : ''}`;
   $('cargando').hidden = true;
   document.body.dataset.listo = '1';
 
@@ -357,13 +403,17 @@ function iniciar() {
     pedido: () => pedido,
     sombrasReales(si) {
       sombrasPersonajes = si;
-      aplicarCalidad(nivel);
+      aplicarCalidad(nivel, escala, true);
     },
     aplicarCalidad: (clave) => {
       pedido = clave;
       auto.activa = false;
-      aplicarCalidad(clave);
+      auto.fijar(clave, 0);
+      aplicarCalidad(clave, 1, true);
     },
+    gpu,
+    /** Resolución interna actual (para pruebas y depuración). */
+    resolucion: () => ({ ancho: renderer.domElement.width, alto: renderer.domElement.height, proporcion: renderer.getPixelRatio(), escala, nivel, antialias: renderer.getContext().getContextAttributes().antialias }),
     enfocar: (id, ms = 0) => cam.enfocar(salas[id], ms),
     vistaGeneral: (ms = 0) => cam.vistaGeneral(ms),
     /** Gira la cámara alrededor del objetivo (radianes) sin animación. */

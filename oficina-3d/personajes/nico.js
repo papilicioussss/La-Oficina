@@ -1319,7 +1319,7 @@ export function crearNico({ liviana = false, semilla: sem = 3 } = {}) {
     const dp = t - parp.inicio;
     if (dp >= 0 && dp < 0.16) cierre = Math.sin((dp / 0.16) * Math.PI);
     else if (parp.doble && dp >= 0.22 && dp < 0.38) cierre = Math.sin(((dp - 0.22) / 0.16) * Math.PI);
-    rostro.actualizar(E, X.feliz > 0.5 ? 0 : cierre);
+    rostro.actualizar(E, X.feliz > 0.5 ? 0 : cierre, t * 1000); // con el reloj de la animación (determinista)
   }
 
   function animar(estado, t, dt) {

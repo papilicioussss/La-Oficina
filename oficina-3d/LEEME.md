@@ -3,7 +3,7 @@
 Página independiente con las cinco salas de La Oficina en 3D, hechas con piezas LEGO por código (Three.js r186, copiado en `vendor/`, sin internet). La oficina SVG de la app sigue siendo la principal: esta carpeta no importa ni modifica nada de `js/`, `css/` ni `index.html`.
 
 - **Abrir:** `https://papilicioussss.github.io/La-Oficina/oficina-3d/` (cuando esté publicada) o, en local, `python3 -m http.server 8123` en la raíz del repositorio y abrir `http://localhost:8123/oficina-3d/`.
-- **Parámetros:** `?calidad=alta|media|baja` fija la calidad (sin parámetro es automática) · `?depurar=1` muestra las guías y la figura gris de referencia.
+- **Parámetros:** `?calidad=alta|media|baja` fija la calidad (sin parámetro es automática) · `?depurar=1` muestra las guías y la figura gris de referencia · `?simular=1` muestra el simulador de estados · `?gpu=normal` ignora la detección de dibujo por software.
 - **Controles:** arrastrar para girar · rueda o pellizco para acercar · dos dedos o clic derecho para mover. Los botones del panel enfocan cada sala.
 
 ## Archivos
@@ -50,7 +50,12 @@ Cada mueble se pide por nombre: `crearModelo('silla', { color })`. La escena no 
 - La escena es fija: se dibuja **solo cuando algo cambia** (cámara, paredes, calidad). Las sombras se recalculan solo cuando cambian.
 - Las piezas fijas se **fusionan por tipo de plástico** con el color en cada vértice, y todos los taquitos de un grupo van en **una malla instanciada** con color por instancia.
 - Paredes y pisos tienen dos versiones (biselada para Alta, caja simple para Media y Baja) y los taquitos dos geometrías (16 y 8 lados); la calidad elige sin reconstruir.
-- Calidad automática: empieza prudente (celular → Media) y baja un nivel solo después de unos 6 s seguidos por debajo de 26 fps mientras se mueve la cámara; nunca sube sola.
+- **Resolución interna** (`calidad.js`): la densidad de la pantalla limitada por el nivel (Alta ×2, Media ×1,5, Baja ×1) y por un **tope de píxeles totales** (Alta 3,7 M, Media 2,2 M, Baja 1,3 M), así un monitor 1440p o 4K no cuesta más que uno Full HD; encima, una **escala dinámica** (100 → 85 → 72 → 60 %).
+- **Calidad automática:** mide en ventanas de 1 s y solo decide con la escena dibujándose en continuo. Compara con el **límite real de la pantalla**, que detecta en reposo (60, 120… o 30 si el navegador está en ahorro de energía): lenta 3 s seguidos (< 78 % del límite) → baja un paso, primero la resolución y después el nivel; holgada 8 s seguidos (≥ 95 %) → sube un paso, sin pasar del nivel inicial. Si una subida termina en bajada antes de 15 s, no vuelve a subir por un minuto (no oscila).
+- **Sin aceleración gráfica** (el navegador dibuja por software: SwiftShader, llvmpipe, "Microsoft Basic Render"…): se detecta al arrancar, empieza en Baja, sin suavizado de bordes (MSAA, que por software multiplica el costo) y muestra un aviso con cómo activar la aceleración. `?gpu=normal` ignora la detección.
+- **Medidor** (pie de página): FPS reales, milisegundos por cuadro, el peor cuadro del último segundo y el límite de la pantalla; en reposo dice "reposo (≤30 fps a propósito)" y en pausa "en pausa", en vez de dejar un número viejo. El panel muestra la gráfica que usa el navegador.
+- Sombras: mientras las paredes suben o bajan al girar la cámara, el mapa de sombras se recalcula uno de cada tres cuadros (y una vez al terminar). El piso exterior que recibe la sombra del edificio mide solo lo que esa sombra alcanza.
+- El suavizado de bordes se decide al crear el lienzo (no se puede cambiar después): si la calidad automática baja desde Alta, la escala dinámica compensa ese costo.
 
 ## Pruebas
 
@@ -101,6 +106,7 @@ Reproduce, en el mismo orden, los `setStatus`, los eventos `chat` y los cambios 
 ## Rendimiento
 
 - Ritmo de dibujo: cada cuadro si algún agente hace algo real o se mueve la cámara; máximo 30 cuadros por segundo si solo respiran; pausa total tras 20 s sin actividad (se reanuda con un toque o con un cambio de estado real).
+- La cara de Nico (lienzo de 512 px en Alta) se redibuja y se sube a la gráfica como mucho 30 veces por segundo.
 - Piezas de cada articulación juntas por tipo de plástico (~14 llamadas por personaje); versión liviana en Media y Baja (~2.600 triángulos frente a ~11.300).
 - Las caminatas avanzan con el tiempo real (no se atrasan si un cuadro llega tarde); las posturas usan un paso recortado.
 
