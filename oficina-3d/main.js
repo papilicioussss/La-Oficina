@@ -12,6 +12,12 @@ import { construirSalas } from './salas.js';
 import { crearCamara, LIMITES, CENTRO } from './camara.js';
 import { NIVELES, nivelInicial, CalidadAutomatica } from './calidad.js';
 import { construirDepuracion } from './depuracion.js';
+import { crearAgentes } from './agentes.js';
+import { crearFuente } from './fuente-estados.js';
+import { crearSimulador } from './simulador.js';
+import { crearEtiquetas } from './etiquetas.js';
+import { estampado } from './materiales.js';
+import { grafico } from './texturas.js';
 import { SALAS } from './plano.js';
 
 const $ = (id) => document.getElementById(id);
@@ -96,6 +102,25 @@ function iniciar() {
   piso.position.y = -1.62;
   piso.receiveShadow = true;
   escena.add(piso);
+  // Personajes: leen los estados SOLO a través de la fuente. En esta etapa la alimenta el simulador (prueba);
+  // en la fase 6 la alimentará la app real.
+  const fuente = crearFuente();
+  const simulador = crearSimulador(fuente);
+  const etiquetas = crearEtiquetas(document.body);
+  // pantalla del analista en la pared: brilla mientras Alex trabaja de verdad (como .analista-working del SVG)
+  const pantallaAlex = estampado('grafico', grafico(), { brillo: true });
+  pantallaAlex.emissive.set('#ffffff');
+  pantallaAlex.emissiveMap = pantallaAlex.map;
+  pantallaAlex.emissiveIntensity = 0;
+  pantallaAlex.needsUpdate = true;
+  let alexTrabaja = false;
+  const agentes = crearAgentes(escena, {
+    fuente,
+    etiquetas,
+    reducido,
+    liviana: !NIVELES[nivel].taquitosFinos,
+    alCambiarAnalista: (si) => (alexTrabaja = si),
+  });
   const depuracion = depurar ? construirDepuracion() : null;
   if (depuracion) escena.add(depuracion);
   const msConstruir = performance.now() - t0;
@@ -137,11 +162,22 @@ function iniciar() {
     cielo.intensity = n.entorno ? 0.45 : 1.3; // sin reflejos de entorno se compensa con luz de cielo
     ajustarMateriales(n);
     detalleTaquitos(n.taquitosFinos);
+    // minifigura fina en Alta, liviana en Media y Baja; las sombras reales de los personajes solo en Alta y si se piden
+    agentes.cambiarDetalle(!n.taquitosFinos, sombrasPersonajes && clave === 'alta');
+    $('sombras-reales').disabled = clave !== 'alta';
     $('calidad').value = pedido === 'auto' ? 'auto' : clave;
     $('estado-calidad').textContent = `Calidad: ${n.nombre}${pedido === 'auto' ? ' (automática)' : ''}`;
     redimensionar();
     pedirDibujo(true);
   }
+
+  // Sombras de los personajes: de contacto por defecto; reales (mapa de sombras recalculado al moverse) solo en Alta
+  let sombrasPersonajes = params.get('sombras') === 'reales';
+  $('sombras-reales').checked = sombrasPersonajes;
+  $('sombras-reales').addEventListener('change', (e) => {
+    sombrasPersonajes = e.target.checked;
+    aplicarCalidad(nivel);
+  });
 
   const auto = new CalidadAutomatica({ alBajar: (clave) => aplicarCalidad(clave) });
   auto.activa = pedido === 'auto';
@@ -152,10 +188,60 @@ function iniciar() {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = info.nombre;
-    b.addEventListener('click', () => cam.enfocar(salas[id], reducido ? 0 : 700));
+    b.addEventListener('click', () => {
+      cam.enfocar(salas[id], reducido ? 0 : 700);
+      agentes.seleccionar(agentes.agentes[id] ? id : null);
+    });
     $('salas').append(b);
   }
-  $('general').addEventListener('click', () => cam.vistaGeneral(reducido ? 0 : 700));
+  $('general').addEventListener('click', () => {
+    cam.vistaGeneral(reducido ? 0 : 700);
+    agentes.seleccionar(null);
+  });
+  // Tocar un personaje: se selecciona y se enfoca su oficina (en la app, tocar un agente abre su oficina)
+  const rayo = new THREE.Raycaster();
+  const puntero = new THREE.Vector2();
+  let inicioToque = null;
+  lienzo.addEventListener('pointerdown', (e) => (inicioToque = [e.clientX, e.clientY]));
+  lienzo.addEventListener('pointerup', (e) => {
+    if (!inicioToque || Math.hypot(e.clientX - inicioToque[0], e.clientY - inicioToque[1]) > 8) return;
+    const r = lienzo.getBoundingClientRect();
+    puntero.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    rayo.setFromCamera(puntero, camara);
+    const hit = rayo.intersectObject(agentes.grupo, true).find((h) => h.object.visible);
+    let o = hit?.object;
+    while (o && !o.name?.startsWith('agente:')) o = o.parent;
+    if (o) {
+      const id = o.name.slice(7);
+      agentes.seleccionar(id);
+      if (agentes.agentes[id].ubicacion === 'office') cam.enfocar(salas[id], reducido ? 0 : 700);
+    }
+  });
+  // Panel del simulador (solo con ?simular=1): herramienta de prueba, reproduce las secuencias reales de la app
+  if (params.get('simular') === '1') {
+    $('simulador').hidden = false;
+    const acciones = {
+      'Nico responde': () => simulador.responder('copy'),
+      'Alex busca y responde': () => simulador.responder('analista', { buscar: true }),
+      'Sam responde con error': () => simulador.responder('guion', { final: 'error' }),
+      'Nico: detener respuesta': () => simulador.responder('copy', { final: 'detener', pensar: 3000 }),
+      'Los tres a la vez': () => (simulador.responder('copy'), simulador.responder('analista', { buscar: true }), simulador.responder('guion')),
+      'Reunión': () => simulador.reunion(),
+      'Reunión con investigación': () => simulador.reunion({ investigar: true }),
+      'Armar el plan': () => simulador.reunion({ plan: true }),
+      'Terminar reunión': () => simulador.terminarReunion(),
+    };
+    for (const [texto, fn] of Object.entries(acciones)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = texto;
+      b.addEventListener('click', () => {
+        despertar();
+        fn();
+      });
+      $('simulador-botones').append(b);
+    }
+  }
   $('calidad').addEventListener('change', (e) => {
     pedido = e.target.value;
     auto.activa = pedido === 'auto';
@@ -174,6 +260,13 @@ function iniciar() {
   // ---------- Bucle ----------
   let ultimo = performance.now();
   let interactuando = false;
+  let actividad = performance.now(); // último momento con algo pasando (gesto, cámara o trabajo de un agente)
+  let acumulado = 0;
+  let ocupados = false;
+  let pasoManual = false; // solo pruebas: la animación la avanza la prueba (navegador sin GPU con cuadros lentos)
+  const PAUSA_MS = 20000;
+  const despertar = () => (actividad = performance.now());
+  for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, despertar, { passive: true });
   let cuadrosPared = 0;
   lienzo.addEventListener('pointerdown', () => (interactuando = true));
   addEventListener('pointerup', () => (interactuando = false));
@@ -181,7 +274,30 @@ function iniciar() {
   function bucle(ahora) {
     const dt = ahora - ultimo;
     ultimo = ahora;
-    if (cam.actualizar(ahora)) sucio = true;
+    if (cam.actualizar(ahora)) {
+      sucio = true;
+      actividad = ahora;
+    }
+    // Ritmo de los personajes (batería y calor del celular):
+    //  - si alguno está haciendo algo real (trabaja, camina, habla, se sienta) o el usuario mueve la cámara: cada cuadro;
+    //  - si solo respiran y parpadean: como máximo 30 cuadros por segundo;
+    //  - tras 20 s sin actividad: se detienen hasta el próximo cambio de estado o gesto del usuario.
+    acumulado += dt;
+    ocupados = agentes.ocupados() || alexTrabaja || pantallaAlex.emissiveIntensity > 0;
+    if (ocupados) actividad = ahora;
+    const quieto = ahora - actividad > PAUSA_MS;
+    if (pasoManual) acumulado = 0;
+    else if (!quieto && (ocupados || interactuando || cam.tween.activo || acumulado >= 1000 / 30)) {
+      const paso = Math.min(1, acumulado / 1000);
+      agentes.actualizar(paso);
+      if (agentes.detalle().sombrasReales) sombras = true; // la sombra real del personaje se recalcula al moverse
+      // brillo de la pantalla de Alex: sube mientras trabaja y se apaga al terminar
+      const meta = alexTrabaja ? 0.25 + (reducido ? 0 : 0.12 * Math.sin(ahora / 260)) : 0;
+      pantallaAlex.emissiveIntensity += (meta - pantallaAlex.emissiveIntensity) * Math.min(1, Math.min(0.1, paso) * 8);
+      if (!alexTrabaja && pantallaAlex.emissiveIntensity < 0.005) pantallaAlex.emissiveIntensity = 0;
+      acumulado = 0;
+      sucio = true;
+    } else if (quieto) acumulado = 0;
     if (actualizarParedes(paredes.paredes, camara, controles.target, Math.min(0.05, dt / 1000), { inmediato: reducido })) {
       sucio = true;
       // mientras una pared sube o baja, sus sombras cambian: en Alta cada cuadro, en el resto uno de cada tres
@@ -193,12 +309,14 @@ function iniciar() {
     if (sucio && !document.hidden) {
       if (sombras) renderer.shadowMap.needsUpdate = true;
       renderer.render(escena, camara);
+      etiquetas.colocar(camara, lienzo.clientWidth, lienzo.clientHeight, posEtiqueta);
       ultima.calls = renderer.info.render.calls;
       ultima.triangulos = renderer.info.render.triangles;
       ultima.conSombras = sombras;
       sucio = false;
       sombras = false;
-      if (interactuando || cam.tween.activo) {
+      // la calidad automática mide mientras se mueve la cámara o algún personaje hace algo real
+      if (interactuando || cam.tween.activo || ocupados) {
         auto.cuadro(dt, nivel);
         if (auto.fps) fps.textContent = `${auto.fps.toFixed(0)} fps`;
       }
@@ -207,6 +325,10 @@ function iniciar() {
     requestAnimationFrame(bucle);
   }
   const ultima = { calls: 0, triangulos: 0, conSombras: false };
+  function posEtiqueta(id, v) {
+    agentes.cabezaDe(id, v);
+    v.y += 2.2;
+  }
   function resumen() {
     $('resumen').textContent = `${ultima.calls} dibujos · ${(ultima.triangulos / 1000).toFixed(0)} mil triángulos por cuadro`;
   }
@@ -223,11 +345,20 @@ function iniciar() {
     controles,
     salas,
     paredes,
+    agentes,
+    fuente,
+    simulador,
+    etiquetas,
+    pantallaAlex,
     suelos,
     limites: LIMITES,
     msConstruir,
     nivel: () => nivel,
     pedido: () => pedido,
+    sombrasReales(si) {
+      sombrasPersonajes = si;
+      aplicarCalidad(nivel);
+    },
     aplicarCalidad: (clave) => {
       pedido = clave;
       auto.activa = false;
@@ -250,5 +381,16 @@ function iniciar() {
     },
     ultima,
     auto,
+    despertar,
+    /** Solo pruebas: detiene el avance automático de los personajes; la prueba llama a `avanzar(dt)`. */
+    pasoManual: (si) => (pasoManual = si),
+    avanzar(dt) {
+      agentes.actualizar(dt);
+      const meta = alexTrabaja ? 0.25 : 0;
+      pantallaAlex.emissiveIntensity += (meta - pantallaAlex.emissiveIntensity) * Math.min(1, dt * 8);
+      if (!alexTrabaja && pantallaAlex.emissiveIntensity < 0.005) pantallaAlex.emissiveIntensity = 0;
+      sucio = true;
+    },
+    pausado: () => performance.now() - actividad > PAUSA_MS,
   };
 }

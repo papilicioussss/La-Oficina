@@ -132,14 +132,16 @@ function crearTaquitos(lista, fino) {
 /**
  * Junta por material todas las mallas fijas (sin textura, no transparentes) que cuelgan de `raiz`, en una malla por
  * material. Las piezas que deben seguir separadas (por ejemplo, un modelo .glb animado) se marcan con
- * `userData.fija = false` y se respetan. Devuelve cuántas mallas se juntaron.
+ * `userData.fija = false` y se respetan. Con `directos` solo se juntan los hijos directos (piezas de una misma
+ * articulación de un personaje, que se mueven juntas). Devuelve cuántas mallas se juntaron.
  */
-export function fusionar(raiz) {
+export function fusionar(raiz, { directos = false } = {}) {
   raiz.updateMatrixWorld(true);
   const inversa = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
   const porMaterial = new Map();
   const quitar = [];
-  raiz.traverse((o) => {
+  const visitar = directos ? (fn) => raiz.children.slice().forEach(fn) : (fn) => raiz.traverse(fn);
+  visitar((o) => {
     if (!o.isMesh || o.isInstancedMesh || !o.userData.fija) return;
     if (o.material.transparent || o.material.map || Array.isArray(o.material)) return;
     let fijo = true;
@@ -173,6 +175,7 @@ export function fusionar(raiz) {
     if (!material.vertexColors) unida.deleteAttribute('color');
     const malla = new THREE.Mesh(unida, material);
     malla.castShadow = sombra;
+    malla.userData.personaje = directos;
     malla.receiveShadow = true;
     malla.userData.fusionada = true;
     raiz.add(malla);

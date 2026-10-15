@@ -105,5 +105,30 @@ for (const [id, ruta] of Object.entries(plano.ROUTES)) {
   else ok(`la ruta de ${id} a la sala de juntas pasa por puertas`);
 }
 
+// ─── Etapa 3: datos de los agentes ─────────────────────────────────────────────────────────────────────────
+const leer = (ruta) => readFileSync(join(aqui, '../../', ruta), 'utf8');
+const store = leer('js/store.js');
+for (const id of plano.AGENT_IDS) {
+  const bloque = store.slice(store.indexOf(`    ${id}: {`), store.indexOf('look:', store.indexOf(`    ${id}: {`)) + 200);
+  const look = new Function(`return (${/look: (\{[^}]*\})/.exec(bloque)[1]})`)();
+  const nombre = /name: '([^']*)'/.exec(bloque)[1];
+  const mio = plano.AGENTES[id];
+  if (JSON.stringify(look) === JSON.stringify(mio.look) && nombre === mio.name) ok(`apariencia por defecto de ${id} (${nombre}) coincide con js/store.js`);
+  else mal(`apariencia de ${id} difiere: ${JSON.stringify(look)} ${nombre}`);
+}
+const meeting = leer('js/meeting.js');
+const orden = new Function(`return ${/const ORDER = (\[[^\]]*\])/.exec(meeting)[1]}`)();
+if (JSON.stringify(orden) === JSON.stringify(plano.ORDEN_REUNION)) ok('orden de turnos de reunión coincide con js/meeting.js');
+else mal(`ORDER difiere: ${orden}`);
+const officeTxt = fuente;
+if (/const PANTS = '([^']+)'/.exec(officeTxt)?.[1] === plano.PANTALON) ok('color del pantalón coincide con js/office.js');
+else mal('PANTS difiere');
+if (/Math\.max\(250, \(dist \/ 5\) \* 1000\)/.test(officeTxt) && plano.CAMINAR.velocidad === 5 && plano.CAMINAR.minimoMs === 250) ok('duración de la caminata coincide con walk() de js/office.js');
+else mal('la fórmula de caminata de office.js cambió');
+const stateTxt = leer('js/state.js');
+const label = new Function(`return ${/export const STATUS_LABEL = (\{[\s\S]*?\});/.exec(stateTxt)[1]}`)();
+if (JSON.stringify(label) === JSON.stringify(plano.STATUS_LABEL)) ok('textos de estado coinciden con STATUS_LABEL de js/state.js');
+else mal('STATUS_LABEL difiere');
+
 console.log(fallos ? `\n${fallos} diferencia(s)` : '\nTodo coincide.');
 process.exit(fallos ? 1 : 0);

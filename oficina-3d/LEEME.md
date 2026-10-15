@@ -59,3 +59,49 @@ python3 -m http.server 8123          # en la raíz del repositorio
 node oficina-3d/pruebas/coherencia.mjs
 node oficina-3d/pruebas/navegador.mjs   # usa el Playwright instalado en el equipo (variable PLAYWRIGHT) y guarda capturas en CAPTURAS
 ```
+
+# Etapa 3 · Personajes (fases 1 a 5, aisladas)
+
+Los tres agentes (Nico, Alex y Sam) aparecen como minifiguras sentadas en su oficina, con su ropa y accesorios, y reflejan los estados de la app. **En esta etapa los estados vienen de un simulador**: la página `oficina-3d/` no está conectada a la app (eso es la fase 6, con autorización aparte).
+
+- **Ver los estados:** `?simular=1` muestra el panel del simulador (Nico responde, Alex busca, error, detener, los tres a la vez, reunión, investigación, plan, terminar reunión).
+- **Sombras reales de los personajes:** casilla del panel o `?sombras=reales` (solo en calidad Alta; por defecto, sombras de contacto).
+
+## Archivos nuevos
+
+| Archivo | Responsabilidad |
+|---|---|
+| `personajes/minifigura.js` | Minifigura de la prueba (copiada) con postura sentada, versión liviana y señal del kit; se registra como modelo `minifigura` |
+| `personajes/cara.js` | Cara estampada (copia sin cambios de `prueba-3d/cara.js`) |
+| `personajes/accesorios.js` | Peinados (`hair()`) y kits (`kitParts()`) de la oficina SVG en 3D: sudaderas, saco, gorra, audífonos, lentes, libreta, tableta, tarjetas y señales (bombillo, lupa, ✓) |
+| `personajes/apariencia.js` | Apariencia por defecto (copiada de `js/store.js`) y, si existe, la guardada por la app (solo lectura) |
+| `agentes.js` | Controla a los tres: estados → animación, "Escribiendo…", gesto de terminado, caminatas, miradas en reunión, señales, selección |
+| `fuente-estados.js` | Única entrada de estados (misma forma que `js/state.js`: `runtime`, `on('status')`, `on('chat')`, `chat(id)`) |
+| `simulador.js` | Herramienta de prueba que reproduce las secuencias reales de `conversation.js` y `meeting.js` |
+| `etiquetas.js` | Nombres y globos en HTML sobre el lienzo, con los textos exactos de la app |
+| `pruebas/personajes.mjs` | Pruebas de las fases 1 a 5 (`FASES=1,2,3,4,5`) |
+
+## Reglas que replica (de `js/office.js`, sin inventar estados)
+
+- `thinking` → teclea y "Pensando…"; "Escribiendo…" solo durante 700 ms después de cada trozo de texto real.
+- `searching` → busca y "Buscando en la web…"; `talking` → habla y "Hablando…".
+- Gesto de terminado (1,7 s) solo al pasar de `thinking`/`searching` a `idle`/`meeting` con respuesta correcta; con error o sin texto, nada. Si arranca otro trabajo real, manda el trabajo.
+- Globo oculto en reposo, al caminar y en reunión sin hablar. Pantalla de Alex encendida solo mientras Alex trabaja.
+- Caminatas: la ubicación (`runtime.location`) se lee en cada cuadro; la caminata dura lo mismo que en el SVG (`max(250 ms, distancia / 5 s)` por tramo), aunque el recorrido 3D tenga puntos de paso extra (`ACCESO_3D` en `plano.js`) para no atravesar escritorios ni sillas.
+- Reunión: quien habla mira a los demás; los demás lo miran (`escucha`). Movimiento reducido: sin caminatas ni oscilaciones; el estado se ve igual.
+
+## Qué reproduce el simulador y qué no
+
+Reproduce, en el mismo orden, los `setStatus`, los eventos `chat` y los cambios de ubicación de `sendToAgent()`/`runAgent()` (pensar, buscar, escribir, error, respuesta vacía, detener con y sin texto) y de `runSession()`/`endMeeting()` (llegada, investigación, turnos en orden, plan, pausa, fin, agente ocupado al convocar).
+
+**No puede verificar hasta la fase 6:** tiempos y textos reales de la IA, errores reales de red o cuota, el chat real en paralelo, y que la app emita exactamente estos eventos en un navegador real.
+
+## Rendimiento
+
+- Ritmo de dibujo: cada cuadro si algún agente hace algo real o se mueve la cámara; máximo 30 cuadros por segundo si solo respiran; pausa total tras 20 s sin actividad (se reanuda con un toque o con un cambio de estado real).
+- Piezas de cada articulación juntas por tipo de plástico (~14 llamadas por personaje); versión liviana en Media y Baja (~2.600 triángulos frente a ~11.300).
+- Las caminatas avanzan con el tiempo real (no se atrasan si un cuadro llega tarde); las posturas usan un paso recortado.
+
+## Interfaz de un personaje (para un futuro .glb)
+
+Un modelo de personaje debe entregar en `objeto.userData.personaje`: `animar(estado, t, dt)`, `sentar(si, inmediato)`, `sentado()`, `mirarA(punto)`, `reposo()`, `cabeza` (Object3D), `senal` (Object3D), `ritmoTecleo` y `liberar()`. Los estados son `idle | thinking | searching | talking | walking | escucha | terminado`.

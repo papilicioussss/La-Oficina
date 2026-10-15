@@ -235,3 +235,48 @@ export const MUEBLES = [
   { sala: 'kike', modelo: 'sofa', huella: [22.4, 29.4, 23.6, 32.8], rot: -90 },
   { sala: 'kike', modelo: 'camaGato', en: [14.2, 31.6] },
 ];
+
+// ─── Agentes (Etapa 3) ─────────────────────────────────────────────────────────────────────────────────────
+// Apariencia por defecto: COPIA de DEFAULTS.agents[id].look de js/store.js (prueba de coherencia incluida).
+// En la fase 1–5 se usa esta apariencia; si el navegador tiene una apariencia personalizada guardada por la app,
+// personajes/apariencia.js la LEE (solo lectura) para que los personajes se vean como en la oficina SVG.
+export const AGENTES = {
+  copy: { name: 'Nico', look: { shirt: '#ff8a3d', skin: '#e0ac69', hair: '#2b1b12', hairStyle: 'short', kit: 'copy' } },
+  analista: { name: 'Alex', look: { shirt: '#008ec7', skin: '#c68642', hair: '#1b1b1b', hairStyle: 'short', kit: 'analista' } },
+  guion: { name: 'Sam', look: { shirt: '#7a5af8', skin: '#8d5524', hair: '#0f0f0f', hairStyle: 'curly', kit: 'guion' } },
+};
+export const AGENT_IDS = ['copy', 'analista', 'guion'];
+export const PANTALON = '#34405a'; // PANTS de js/office.js
+// Orden de los turnos en la sala de juntas: copia de ORDER de js/meeting.js
+export const ORDEN_REUNION = ['analista', 'guion', 'copy'];
+// Caminata de los agentes en la oficina SVG (walk de js/office.js): cada tramo dura max(250 ms, distancia / 5 s).
+export const CAMINAR = { velocidad: 5, minimoMs: 250 };
+// Textos de estado: copia de STATUS_LABEL de js/state.js (el "Escribiendo…" lo deduce office.js, ver agentes.js)
+export const STATUS_LABEL = { idle: '', thinking: 'Pensando…', searching: 'Buscando en la web…', meeting: 'En reunión', talking: 'Hablando…' };
+
+// Puntos de paso SOLO de la vista 3D (no existen en el SVG, donde el personaje se desliza por encima de los muebles):
+//   salida: del asiento al primer punto de la ruta sin atravesar el escritorio (levantarse hacia un lado).
+//   mesa:   del último punto de la ruta al puesto de reunión entrando por el hueco junto a su silla (sin cruzar las
+//           sillas de los demás). La duración TOTAL de cada caminata sigue siendo la del SVG (ver agentes.js).
+export const ACCESO_3D = {
+  salida: { copy: [[8.7, 4.5]], analista: [[20.9, 4.5], [20.9, 7.7]], guion: [[8.7, 16.5]] },
+  mesa: { analista: [[14.9, 14.75], [14.9, 16.35]], guion: [[17.0, 14.75], [17.0, 16.35]], copy: [[21.0, 14.75], [21.0, 16.35]] },
+};
+
+/** Duración (ms) de la caminata de un agente en el SVG (walk() de js/office.js): suma de max(250 ms, distancia / 5 s). */
+export function duracionCaminata(id, hacia) {
+  const ruta = hacia === 'meeting' ? [...ROUTES[id], MEET[id]] : [...ROUTES[id]].reverse().concat([SEATS[id]]);
+  let desde = hacia === 'meeting' ? SEATS[id] : MEET[id];
+  let total = 0;
+  for (const p of ruta) {
+    total += Math.max(CAMINAR.minimoMs, (Math.hypot(p[0] - desde[0], p[1] - desde[1]) / CAMINAR.velocidad) * 1000);
+    desde = p;
+  }
+  return total;
+}
+
+/** Recorrido 3D (puntos del plano) de un agente hacia la sala ('meeting') o a su oficina ('office'). */
+export function recorrido3D(id, hacia) {
+  const ida = [SEATS[id], ...ACCESO_3D.salida[id], ...ROUTES[id], ...ACCESO_3D.mesa[id], MEET[id]];
+  return hacia === 'meeting' ? ida : ida.slice().reverse();
+}

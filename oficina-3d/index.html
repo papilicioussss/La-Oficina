@@ -30,6 +30,12 @@
       #aviso a { font-weight: 600; }
       #cargando { position: fixed; inset: 0; display: grid; place-content: center; font-size: 15px; opacity: 0.7; pointer-events: none; }
       [hidden] { display: none !important; }
+      .etiquetas { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+      .etiqueta { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; will-change: transform; }
+      .etiqueta .placa { font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; padding: 3px 9px; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+      .etiqueta.es-activo .placa { outline: 2px solid #00b9ec; outline-offset: 1px; }
+      .etiqueta .globo { font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #1d2433; background: #ffffff; padding: 4px 10px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,.18); white-space: nowrap; }
+      @media (prefers-color-scheme: dark) { .etiqueta .globo { background: #2a2a2d; color: #f5f5f7; } }
       @media (pointer: coarse) { button, select { min-height: 44px; } }
       @media (max-width: 600px) { #resumen { display: none; } }
     </style>
@@ -54,7 +60,15 @@
         </select>
       </div>
       <div class="fila">
+        <label><input type="checkbox" id="sombras-reales" /> Sombras reales de los personajes (solo calidad Alta)</label>
+      </div>
+      <div id="simulador" hidden>
+        <p><strong>Simulador de estados (prueba)</strong> · reproduce las secuencias reales del chat y de la sala de juntas.</p>
+        <div class="fila" id="simulador-botones"></div>
+      </div>
+      <div class="fila">
         <a id="enlace-depurar" href="?depurar=1">Ver herramientas de depuración</a>
+        <a href="?simular=1">Probar estados (simulador)</a>
       </div>
       <div class="fila"><a href="../">← Volver a La Oficina</a></div>
     </details>
